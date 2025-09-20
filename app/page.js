@@ -20,6 +20,8 @@ export default function ReviewPage() {
 
   const startRef = useRef(null);
 
+  const API = process.env.NEXT_PUBLIC_BACKEND_URL;
+
   const [offers, setOffers] = useState([]);
   const [rejected, setRejected] = useState(() => {
     try {
@@ -35,10 +37,6 @@ export default function ReviewPage() {
   const selectionList = useSelector(selectSelectionList);
   console.log("selectionList:", selectionList)
   const [serverSent, setServerSent] = useState({ accepted: [], rejected: [] });
-  // const alreadySent = useSelector((state) => state.drafts.alreadySent) || {
-  //   accepted: [],
-  //   rejected: [],
-  // };
 
   const [showAcceptedPreview, setShowAcceptedPreview] = useState(false);
   const [showRejectedPreview, setShowRejectedPreview] = useState(false);
@@ -177,7 +175,7 @@ console.log("filt:", filteredOffers);
       setSentInfo(null);
   
       // Envoie EXACTEMENT ce que tu as sélectionné (objets complets)
-      const res = await fetch("/api/sendApproved", {
+      const res = await fetch(`${API}/api/sendApproved`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: selectionList }),
