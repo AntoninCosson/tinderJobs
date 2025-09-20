@@ -7,6 +7,10 @@ const initialState = {
   selection: {
     order: [],
     byId: {}
+  },
+  alreadySent: {
+    accepted: [], 
+    rejected: []
   }
 };
 
@@ -35,23 +39,50 @@ const draftsSlice = createSlice({
         ensureSelection(state);
         state.selection.byId[id]=data; 
         if(!state.selection.order.includes(id)) state.selection.order.push(id);
-      },
-      queueDrop:(state,{payload:{id}})=>{
-        ensureSelection(state);
-        delete state.selection.byId[id];
-        state.selection.order = state.selection.order.filter(x=>x!==id);
-      },
-      clearSelection:(state)=>{
-        ensureSelection(state);
-        state.selection.byId = {};
-        state.selection.order = [];
-      },
-      resetAll: () => initialState,
+    },
+    queueDrop:(state,{payload:{id}})=>{
+      ensureSelection(state);
+      delete state.selection.byId[id];
+      state.selection.order = state.selection.order.filter(x=>x!==id);
+    },
+    clearSelection:(state)=>{
+      ensureSelection(state);
+      state.selection.byId = {};
+      state.selection.order = [];
+    },
+
+    resetSwipe: (state) => {
+      state.swiped = {};
+    },
+
+    resetAll: () => initialState,
+
+    markAsSent: (state, action) => {
+      const { accepted = [], rejected = [] } = action.payload || {};
+      if (!state.alreadySent) state.alreadySent = { accepted: [], rejected: [] };
+    
+      for (const draft of accepted) {
+        const id = draft.id;
+        state.byId[id] = draft; // on garde l’objet complet
+        if (!state.alreadySent.accepted.includes(id)) {
+          state.alreadySent.accepted.push(id);
+        }
+      }
+    
+      for (const draft of rejected) {
+        const id = draft.id;
+        state.byId[id] = draft; // idem côté rejet
+        if (!state.alreadySent.rejected.includes(id)) {
+          state.alreadySent.rejected.push(id);
+        }
+      }
+    },
+      
   },
 });
 
 export const {
-    replaceDraft, resetDraft, queueUp, queueDrop, clearSelection, resetAll
+    replaceDraft, resetDraft, queueUp, queueDrop, clearSelection,resetSwipe, resetAll, markAsSent
   } = draftsSlice.actions;
 
   export const selectDraftById = (s,id)=> s.drafts?.byId?.[id];

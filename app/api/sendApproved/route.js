@@ -1,43 +1,45 @@
 // app/api/sendApproved/route.js
+export const dynamic = "force-dynamic"; // évite tout static rendering/caching
+
+function safeParse(text) {
+  try { return JSON.parse(text); } catch { return text; }
+}
+
 export async function POST(req) {
   try {
-    const { items } = await req.json();
-    if (!Array.isArray(items)) {
-      return new Response(JSON.stringify({ ok: false, error: "items must be array" }), { status: 400 });
+    const { items = [] } = await req.json().catch(() => ({ items: [] }));
+
+    // Optionnel : forward vers un webhook si présent en env
+    const webhook = process.env.SEND_WEBHOOK_URL; // mets ta valeur dans .env.local si besoin
+    let forwarded = null;
+
+    if (webhook) {
+      const fw = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const bodyText = await fw.text(); // on lit le texte brut pour ne pas re-crasher si pas du JSON
+      forwarded = { ok: fw.ok, status: fw.status, body: safeParse(bodyText) };
+
+      if (!fw.ok) {
+        console.error("webhook failed:", forwarded);
+        // On **n’échoue pas** volontairement ici pour garder ton UX souple,
+        // mais tu peux retourner une 502 si tu veux bloquer l’envoi tant que le webhook échoue.
+      }
     }
 
-    // ✅ ENVOYER TOUT: pas de mapping, pas de sanitize destructif
-    const payload = items.filter(x => x && typeof x === "object");
-
-    const target = process.env.SEND_TARGET;
-    if (!target) {
-      // Dev mode: pas de webhook → on confirme juste la réception
-      return new Response(JSON.stringify({ ok: true, count: payload.length, forwarded: false }), { status: 200 });
-    }
-
-    // Timeout soft
-    const ac = new AbortController();
-    const to = setTimeout(() => ac.abort(), 15000);
-
-    const res = await fetch(target, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // on forward tel quel
-      body: JSON.stringify({ items: payload }),
-      signal: ac.signal,
-    }).catch(e => ({ ok: false, status: 0, json: async () => ({ error: e.message }) }));
-
-    clearTimeout(to);
-
-    if (!res || !res.ok) {
-      let err = "webhook failed";
-      try { const j = await res.json(); err = j?.error || err; } catch {}
-      return new Response(JSON.stringify({ ok: false, error: err }), { status: 502 });
-    }
-
-    const upstream = await res.json().catch(() => ({}));
-    return new Response(JSON.stringify({ ok: true, count: payload.length, forwarded: true, upstream }), { status: 200 });
+    return Response.json({ ok: true, count: items.length, forwarded });
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: e.message || "invalid payload" }), { status: 400 });
+    console.error("sendApproved error:", e);
+    return Response.json(
+      { ok: false, error: e?.message || String(e) },
+      { status: 500 }
+    );
   }
+}
+
+// pratique pour tester vite fait depuis le navigateur
+export async function GET() {
+  return Response.json({ ok: true, msg: "sendApproved is alive" });
 }

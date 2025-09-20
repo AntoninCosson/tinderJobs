@@ -1,4 +1,5 @@
 import Providers from "./store/Providers";
+import { connectDB } from "@/lib/db";
 
 export const metadata = {
   title: "Ma Landing",
@@ -6,7 +7,9 @@ export const metadata = {
 };
 
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  await connectDB();
+
   return (
     <html lang="fr">
       <body>
