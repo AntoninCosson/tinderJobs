@@ -2,6 +2,11 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const webhookRaw = process.env.SEND_WEBHOOK_URL || '';
+const webhook = webhookRaw.trim();
+
+console.log("webRaw&trim", webhookRaw, webhook)
+
 function safeParse(text) {
   try { return JSON.parse(text); } catch { return text; }
 }
@@ -28,20 +33,28 @@ export async function POST(req) {
     // 3) Emit webhook with strong diagnostics
     let forwarded;
     try {
-      const fw = await fetch(webhook, {
+      const fetchwebh = await fetch(webhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // tip: add your auth header here if needed
         body: JSON.stringify({ items }),
         cache: 'no-store',
       });
-      const bodyText = await fw.text();
-      forwarded = { ok: fw.ok, status: fw.status, body: safeParse(bodyText) };
-      if (!fw.ok) console.error('sendApproved: webhook non-2xx', forwarded);
+      const bodyText = await fetchwebh.text();
+      forwarded = { ok: fetchwebh.ok, status: fetchwebh.status, body: safeParse(bodyText) };
+      if (!fetchwebh.ok) console.error('sendApproved: webhook non-2xx', forwarded);
     } catch (e) {
-      console.error('sendApproved: fetch to webhook failed:', e?.name, e?.message);
+      const cause = e?.cause || {};
+      console.error('sendApproved: fetch to webhook failed:', {
+        name: e?.name,
+        message: e?.message,
+        code: cause.code,        // e.g. ENOTFOUND, ECONNREFUSED
+        errno: cause.errno,
+        syscall: cause.syscall,
+        hostname: cause.hostname,
+      });
       return Response.json(
-        { ok: false, step: 'fetch', error: e?.message || String(e) },
+        { ok: false, step: 'fetch', error: e?.message || String(e), code: cause.code, host: cause.hostname },
         { status: 502 }
       );
     }
@@ -57,53 +70,3 @@ export async function GET() {
   return Response.json({ ok: true, msg: 'sendApproved is alive' });
 }
 
-
-
-
-
-
-// // app/api/sendApproved/route.js
-// export const dynamic = "force-dynamic"; // évite tout static rendering/caching
-
-// function safeParse(text) {
-//   try { return JSON.parse(text); } catch { return text; }
-// }
-
-// export async function POST(req) {
-//   try {
-//     const { items = [] } = await req.json().catch(() => ({ items: [] }));
-
-//     // Optionnel : forward vers un webhook si présent en env
-//     const webhook = process.env.SEND_WEBHOOK_URL; // mets ta valeur dans .env.local si besoin
-//     let forwarded = null;
-
-//     if (webhook) {
-//       const fw = await fetch(webhook, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ items }),
-//       });
-//       const bodyText = await fw.text(); // on lit le texte brut pour ne pas re-crasher si pas du JSON
-//       forwarded = { ok: fw.ok, status: fw.status, body: safeParse(bodyText) };
-
-//       if (!fw.ok) {
-//         console.error("webhook failed:", forwarded);
-//         // On **n’échoue pas** volontairement ici pour garder ton UX souple,
-//         // mais tu peux retourner une 502 si tu veux bloquer l’envoi tant que le webhook échoue.
-//       }
-//     }
-
-//     return Response.json({ ok: true, count: items.length, forwarded });
-//   } catch (e) {
-//     console.error("sendApproved error:", e);
-//     return Response.json(
-//       { ok: false, error: e?.message || String(e) },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-// // pratique pour tester vite fait depuis le navigateur
-// export async function GET() {
-//   return Response.json({ ok: true, msg: "sendApproved is alive" });
-// }
