@@ -1,6 +1,8 @@
 // app/api/alreadySent/route.js
 import { connectDB } from "@/lib/db";
 import AlreadySent from "@/models/AlreadySent";
+import { NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId") || "default";
   const doc = await AlreadySent.findOne({ userId }).lean();
-  return Response.json({
+  return NextResponse.json({
     ok: true,
     data: doc ?? { userId, accepted: [], rejected: [] },
   });
