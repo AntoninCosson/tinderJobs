@@ -1,44 +1,72 @@
 // app/api/sendApproved/route.js
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { connectDB } from '@/lib/db';
-import AlreadySent from '@/models/AlreadySent';
+import { connectDB } from "@/lib/db";
+import AlreadySent from "@/models/AlreadySent";
 
-function safeParse(text) { try { return JSON.parse(text); } catch { return text; } }
+function safeParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 export async function POST(req) {
   let body;
-  try { body = await req.json(); }
-  catch { return Response.json({ ok:false, error:'Invalid JSON body' }, { status:400 }); }
-
-  console.log("body:", body)
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json(
+      { ok: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
 
   const { accepted = [], rejected = [] } = body || {};
-  // if (!userId) {
-  //   return Response.json({ ok:false, error:'Missing userId' }, { status:400 });
-  // }
   const acc = Array.isArray(accepted) ? accepted : [];
   const rej = Array.isArray(rejected) ? rejected : [];
 
-  // 2) Save to Mongo (upsert + move entre listes)
   let mongo = { insertedAccepted: 0, insertedRejected: 0 };
   try {
     await connectDB();
+    const doc = await AlreadySent.findOne({}).lean();
 
-    // on retire les doublons par id dans les listes entrantes (côté payload)
-    const uniqById = (arr) => Object.values(
-      arr.reduce((m, it) => (it?.id ? (m[it.id] = it) : m), {})
-    );
+    const existingIds = new Set([
+      ...(doc?.accepted?.map((x) => x.id) || []),
+      ...(doc?.rejected?.map((x) => x.id) || []),
+    ]);
+
+    const incoming = [...acc, ...rej];
+    const incomingIds = new Set(incoming.map((x) => x.id).filter(Boolean));
+
+    for (const id of incomingIds) {
+      if (existingIds.has(id)) {
+        return Response.json({
+          ok: true,
+          note: "DB wins: at least one offer already exists",
+          skippedIds: [...incomingIds].filter((i) => existingIds.has(i)),
+        });
+      }
+    }
+
+    const uniqById = (arr) =>
+      Object.values(arr.reduce((m, it) => (it?.id ? (m[it.id] = it) : m), {}));
 
     const accUniq = uniqById(acc);
     const rejUniq = uniqById(rej);
-    const idsToPull = [...new Set([...accUniq, ...rejUniq].map(i => i.id).filter(Boolean))];
 
-    // pull par id des deux listes (pour éviter doublons & gérer "move" entre accepted/rejected)
+    const accIds = new Set(accUniq.map((i) => i.id).filter(Boolean));
+    const rejExclusive = rejUniq.filter((i) => !accIds.has(i.id));
+
+    const idsToPull = [
+      ...new Set([...accUniq, ...rejExclusive].map((i) => i.id).filter(Boolean)),
+    ];
+
     if (idsToPull.length) {
       await AlreadySent.updateOne(
-        // { userId },
+        {},
         {
           $pull: {
             accepted: { id: { $in: idsToPull } },
@@ -49,68 +77,30 @@ export async function POST(req) {
       );
     }
 
-    // push dans chaque liste (si non vide)
     const ops = {};
     if (accUniq.length) ops.accepted = { $each: accUniq };
-    if (rejUniq.length) ops.rejected = { $each: rejUniq };
+    if (rejExclusive.length) ops.rejected = { $each: rejExclusive };
 
     if (Object.keys(ops).length) {
-      const res = await AlreadySent.updateOne(
-        { userId },
-        { $setOnInsert: { userId }, $push: ops },
-        { upsert: true }
-      );
-      // simple metrics
+      const res = await AlreadySent.updateOne({}, { $push: ops }, { upsert: true });
       mongo.insertedAccepted = accUniq.length;
-      mongo.insertedRejected = rejUniq.length;
+      mongo.insertedRejected = rejExclusive.length;
       mongo.upserted = !!res.upsertedCount;
       mongo.modified = res.modifiedCount;
     }
   } catch (e) {
-    console.error('sendApproved: DB error:', e?.name, e?.message);
-    return Response.json({ ok:false, step:'db', error:e?.message || String(e) }, { status:500 });
+    console.error("sendApproved: DB error:", e?.name, e?.message);
+    return Response.json(
+      { ok: false, step: "db", error: e?.message || String(e) },
+      { status: 500 }
+    );
   }
 
-  // 3) Optional: forward au webhook
-  const webhook = (process.env.SEND_WEBHOOK_URL || '').trim();
-  if (!webhook) {
-    return Response.json({ ok:true, count: items.length, forwarded: null });
-  }
-
-  let forwarded = null;
-  if (webhook) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 10000);
-      const fw = await fetch(webhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, accepted: acc, rejected: rej }),
-        cache: 'no-store',
-        signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      const bodyText = await fw.text();
-      forwarded = { ok: fw.ok, status: fw.status, body: safeParse(bodyText) };
-      if (!fw.ok) console.error('sendApproved: webhook non-2xx', forwarded);
-    } catch (e) {
-      const cause = e?.cause || {};
-      console.error('sendApproved: fetch to webhook failed:', {
-        name: e?.name, message: e?.message,
-        code: cause.code, errno: cause.errno, syscall: cause.syscall, hostname: cause.hostname,
-      });
-      // On n’échoue pas la requête si le webhook rate : la DB est déjà à jour
-      forwarded = { ok:false, error:e?.message || String(e) };
-    }
-  } else {
-    console.warn('sendApproved: SEND_WEBHOOK_URL not set — skipping webhook');
-  }
-
-  return Response.json({ ok:true, mongo, forwarded }, { status:200 });
+  return Response.json({ ok: true, mongo }, { status: 200 });
 }
 
 export async function GET() {
-  return Response.json({ ok:true, msg:'sendApproved is alive' });
+  return Response.json({ ok: true, msg: "sendApproved is alive" });
 }
 
 // try {
