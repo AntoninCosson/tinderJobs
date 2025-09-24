@@ -217,6 +217,10 @@ function CardBody({ offer, startRef }) {
                 <p style={{fontSize: "27px"}}>
                     {offer.postedAt}
                 </p>
+
+                <p style={{fontSize: "27px"}}>
+                    {offer.location}
+                </p>
             </div>
         </div>
         </>

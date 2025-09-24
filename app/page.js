@@ -191,7 +191,10 @@ console.log("filt:", filteredOffers);
         offer: o.offer,
         description: o.description,
         postedAt: o.postedAt,
+        location: o.location
       }));
+
+      console.log("acceptedDrafts:", acceptedDrafts )
       const rejectedDrafts = Array.from(rejected.values()).map((o) => ({
         id: getDraftId(o),
         company: o.company,

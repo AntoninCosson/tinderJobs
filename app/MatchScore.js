@@ -28,18 +28,30 @@ function MatchScore({ offer }) {
             }}
           >
           <p style={{fontSize: "27px"}}><strong>Score : </strong>{offer.mathingScore.score}</p>
-          <p style={{fontSize: "25px", marginBottom: "10px"}}><strong>Metrics:</strong></p>
-          <ul style={{ width: "70vw", paddingLeft: 16 }}>
-            {keysToShow.map((key) => (
-              <p key={key}
-              style={{
-                margin: "7px",
-                fontSize: "17px"
-              }}>
-                {key}: {metrics[key] ?? "—"}
-              </p>
-            ))}
-          </ul>
+          <p style={{ fontSize: "25px", marginBottom: "10px" }}>
+          <strong>Overlap :</strong>
+            </p>
+
+            {(() => {
+              const overlap = offer?.overlap ?? offer?.mathingScore?.overlap ?? {};
+              const tech = overlap?.tech ?? [];
+              const soft = overlap?.soft ?? [];
+            
+              return (
+                <div style={{ width: "70vw", paddingLeft: 16 }}>
+                  <p style={{ margin: "7px", fontSize: "17px" }}>
+                    <strong>Tech</strong> ({tech.length}) :
+                    {" "}
+                    {tech.length ? tech.join(", ") : "None"}
+                  </p>
+                  <p style={{ margin: "7px", fontSize: "17px" }}>
+                    <strong>Soft</strong> ({soft.length}) :
+                    {" "}
+                    {soft.length ? soft.join(", ") : "None"}
+                  </p>
+                </div>
+              );
+            })()}
 
           <p style={{fontSize: "25px", marginBottom: "10px"}}><strong>Missing Skills:</strong></p>
           <ul style={{ width: "70vw", paddingLeft: 16 }}>
