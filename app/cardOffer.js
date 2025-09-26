@@ -1,17 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { 
-  replaceDraft, 
-  resetDraft, 
-  queueUp, 
-  queueDrop, 
-  clearSelection, 
-  selectSelectionCount, 
-  selectSelectionList,
-  selectDraftById,
-} from "./store/draftsSlice";
+import { useDrafts } from "./hooks/draftsContext";
 
 
 import Missions from "./Missions";
@@ -24,7 +14,6 @@ import Urls from "./Urls";
 import ManualChanges from "./ManualChanges";
 
 
-// helpers HOISTÉS (levés par le moteur JS)
 function deepClone(o) {
     return typeof structuredClone === "function"
       ? structuredClone(o)
@@ -41,10 +30,15 @@ function deepClone(o) {
   }
 
 function CardBody({ offer, startRef }) {
-  const dispatch = useDispatch();
+
+  const {
+    selectDraftById, replaceDraft, resetDraft, queueUp, queueDrop, markAsSent
+  } = useDrafts();
+  
+  const draft = selectDraftById(getDraftId(offer));
+
   const draftId = getDraftId(offer);
-  const draft = useSelector((s) => selectDraftById(s, getDraftId(offer)));
-  const payload = draft ?? deepClone(offer);
+
 
   const [nbClick, setNbClick] = useState(0);
 
@@ -100,17 +94,13 @@ function CardBody({ offer, startRef }) {
     startRef.current = null;
   };
 
-  const setNewOffer = useCallback(
-      (updater) => {
-        const current = draft ?? deepClone(offer);
-        const next = typeof updater === "function" ? updater(current) : updater;
-        dispatch(replaceDraft({ id: draftId, data: next }));
-      },
-      [dispatch, draft, draftId, offer]
-    );
+    const setNewOffer = useCallback((updater) => {
+      const current = draft ?? deepClone(offer);
+      const next = typeof updater === "function" ? updater(current) : updater;
+      replaceDraft(draftId, next);
+    }, [draft, draftId, offer, replaceDraft]);
     const newOffer = draft ?? deepClone(offer);
 
-  // helpers
   function AutoResizeText({ children, maxFontSize = 33, minFontSize = 21, style = {} }) {
     const ref = useRef(null);
     const [fontSize, setFontSize] = useState(maxFontSize);
