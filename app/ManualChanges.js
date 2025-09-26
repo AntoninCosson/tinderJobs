@@ -51,30 +51,6 @@ export default function ManualChanges({ offer, newOffer, setNewOffer, onValidate
   const skills = cv.skills ?? {};
   const experiences = Array.isArray(cv.experiences) ? cv.experiences : [];
 
-  function seedLanguagesFromFallback() {
-    setNewOffer(prev => {
-      const next = deepClone(prev);
-      const cv0 = next.cvInfos?.[0] ?? (next.cvInfos = [{}], next.cvInfos[0]);
-      cv0.personal_info = cv0.personal_info || {};
-  
-      if (Array.isArray(cv0.personal_info.languages) && cv0.personal_info.languages.length > 0) {
-        return next;
-      }
-  
-      const seed = [];
-      if (cv0.personal_info.anglais)  seed.push({ name: "anglais",  level: String(cv0.personal_info.anglais) });
-      if (cv0.personal_info.japonais) seed.push({ name: "japonais", level: String(cv0.personal_info.japonais) });
-  
-      if (seed.length === 0) return next;
-  
-      cv0.personal_info.languages = seed;
-  
-      delete cv0.personal_info.anglais;
-      delete cv0.personal_info.japonais;
-  
-      return next;
-    });
-  }
 
   function isGroupFullySelected(groupKey, list) {
     const set = skillsRemoveSel[groupKey];
@@ -256,7 +232,6 @@ export default function ManualChanges({ offer, newOffer, setNewOffer, onValidate
   
 
   // update newOffer
-
   function updateDiploma(idx, payload) {
     setNewOffer(prev => {
       const next = deepClone(prev);
@@ -578,8 +553,23 @@ export default function ManualChanges({ offer, newOffer, setNewOffer, onValidate
     setNewOffer(structuredClone(offer));
   };
 
+  function getDraftId(o) {
+    return o?.expectedName ||
+      `${o?.cvInfos?.[0]?.personal_info?.firstName || ""}_${o?.company || o?.offer || ""}`;
+  }
+
   // --- validate output ---
-  function handleValidate() {
+  async function handleValidate() {
+    const id = getDraftId(newOffer);
+    try {
+      await fetch("/api/snapshot", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "default", offerId: id, snapshot: newOffer }),
+      });
+    } catch (e) {
+      console.warn("Failed to persist snapshot:", e);
+    }
     console.log("✅ newOffer:", newOffer);
     onValidate?.(newOffer);
   }
@@ -1148,7 +1138,7 @@ style={{
         console.log("valider", newOffer)
       }}
     >
-      Valider
+      Save
     </button>
 </div>
 
@@ -1341,7 +1331,6 @@ style={{
                           const next = [...editor.tasks];
                           next[i] = e.target.value;
                         
-                          // garde toujours une case vide en bas
                           if (i === editor.tasks.length - 1 && e.target.value.trim() !== "") {
                             next.push("");
                           }
@@ -1392,7 +1381,6 @@ style={{
                         onChange={(e) => {
                           const next = [...editor.tasks];
                           next[i] = e.target.value;
-                          // Option : toujours garder une dernière case vide
                           if (i === editor.tasks.length - 1 && e.target.value.trim() !== "") {
                             next.push("");
                           }
