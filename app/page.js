@@ -43,7 +43,7 @@ export default function ReviewPage() {
   const [sending, setSending] = useState(false);
   const [sentInfo, setSentInfo] = useState(null);
 
-  const resetSwipesOnly = () => {
+  const resetSwipesOnly = async () => {
     resetAll();
     setRejected(new Map());
     localStorage.removeItem("rejectedOffers");
@@ -53,6 +53,23 @@ export default function ReviewPage() {
         .filter((k) => k.startsWith("nbClick:"))
         .forEach((k) => localStorage.removeItem(k));
     } catch {}
+
+    // reset Mongo
+    try {
+      const res = await fetch("/api/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "default",
+          offerId: "*", // ou un flag spécial
+          status: "unread",
+        }),
+      });
+      console.log("[resetSwipesOnly] reset response:", await res.json());
+    } catch (err) {
+      console.error("[resetSwipesOnly] reset error:", err);
+    }
+
     setOffers([]);
     setUpload((u) => !u);
   };
@@ -62,7 +79,9 @@ export default function ReviewPage() {
       try {
         const ts = Date.now(); // cache-busting
         const [offersRes, sentRes] = await Promise.all([
-          fetch(`/api/getOffers?userId=default&ts=${ts}`, { cache: "no-store" }),
+          fetch(`/api/getOffers?userId=default&ts=${ts}`, {
+            cache: "no-store",
+          }),
           fetch(`/api/alreadySent?userId=default&ts=${ts}`, {
             cache: "no-store",
           }),
@@ -91,9 +110,7 @@ export default function ReviewPage() {
           ...sent.rejected.map((o) => o.id),
         ]);
 
-
         console.log("alreadyIds:", [...alreadyIds]);
-
       } catch (err) {
         console.error("loadData error:", err);
         setServerSent({ accepted: [], rejected: [] });
@@ -163,27 +180,55 @@ export default function ReviewPage() {
       if (dir === "right") {
         queueUp(draftId, payload);
 
-        await fetch("/api/offers/status", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: "default",
-            offerId,
-            status: "queued",
-          }),
-        });
+        const body = {
+          userId: "default",
+          offerId,
+          status: "queued",
+        };
+
+        console.log("[handleSwipe] PATCH → /api/status", body);
+
+        try {
+          const res = await fetch("/api/status", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          console.log("[handleSwipe] response status:", res.status);
+
+          const text = await res.text();
+          console.log("[handleSwipe] response body:", text);
+        } catch (err) {
+          console.error("[handleSwipe] fetch error:", err);
+        }
       }
 
       if (dir === "left") {
-        await fetch("/api/offers/status", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: "default",
-            offerId,
-            status: "rejected",
-          }),
-        });
+        queueDrop(draftId, payload);
+
+        const body = {
+          userId: "default",
+          offerId,
+          status: "rejected",
+        };
+
+        console.log("[handleSwipe] PATCH → /api/status", body);
+
+        try {
+          const res = await fetch("/api/status", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          console.log("[handleSwipe] response status:", res.status);
+
+          const text = await res.text();
+          console.log("[handleSwipe] response body:", text);
+        } catch (err) {
+          console.error("[handleSwipe] fetch error:", err);
+        }
 
         setRejected((prev) => {
           const next = new Map(prev);
