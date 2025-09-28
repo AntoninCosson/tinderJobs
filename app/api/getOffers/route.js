@@ -6,7 +6,7 @@ import { connectDB } from "@/lib/db";
 import Offer from "@/models/Offer"; 
 import UserOffer from "@/models/UserOffer"; 
 
-
+import mongoose from 'mongoose';
 
 function normalizeOffersPayload(p) {
   if (!p) return [];
@@ -21,6 +21,7 @@ export async function POST(req) {
   try {
     await connectDB();
 
+    console.log('[DB]', mongoose.connection.host, mongoose.connection.name);
     const url = new URL(req.url);
     const qsUserId = url.searchParams.get("userId");
     const body = await req.json().catch(() => ({}));
