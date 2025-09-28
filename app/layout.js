@@ -1,5 +1,4 @@
 
-import { connectDB } from "@/lib/db";
 import ClientProviders from "./ClientProviders";
 
 export const metadata = {
