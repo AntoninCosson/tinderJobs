@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 const OfferSchema = new mongoose.Schema(
   {
     _id: { type: String, required: true },
+    userId: { type: String, index: true },
     offer: { type: String, required: true }, 
     title: { type: String },  
     company: { type: String, required: true },
@@ -38,5 +39,7 @@ const OfferSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+OfferSchema.index({ userId: 1, createdAt: -1 }); 
 
 export default mongoose.models.Offer || mongoose.model("Offer", OfferSchema);

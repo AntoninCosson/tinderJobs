@@ -1,0 +1,389 @@
+"use client";
+import { useEffect, useState } from "react";
+
+const emptyRow = () => ({
+  query: "",
+  where: "",
+  sinceDays: 2,
+  remote: "any",
+  results: 0,
+  minSalary: "",
+});
+
+export default function QueriesModal({ onClose, onSubmit, loading }) {
+  const [rows, setRows] = useState([emptyRow()]);
+  const [err, setErr] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = () => setIsMobile(mq.matches);
+    handler();
+    mq.addEventListener?.("change", handler);
+    return () => mq.removeEventListener?.("change", handler);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("scrapeQueries") || "[]");
+      if (Array.isArray(saved) && saved.length) setRows(saved);
+    } catch {}
+  }, []);
+
+  function update(i, patch) {
+    setRows((prev) =>
+      prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
+    );
+  }
+
+  async function saveDraft() {
+    setErr("");
+    try {
+      localStorage.setItem("scrapeQueries", JSON.stringify(rows));
+
+      const name =
+        (rows[0]?.query?.trim() || "Search") +
+        " · " +
+        new Date().toLocaleString();
+
+      const res = await fetch("/api/querysets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          queries: rows,
+        }),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j?.ok === false) {
+        throw new Error(j?.error || `HTTP ${res.status}`);
+      }
+
+      console.log("[saveDraft] OK, queryset id:", j.id);
+    } catch (e) {
+      console.error("[saveDraft] error:", e);
+      setErr(e.message || "Erreur lors de l’enregistrement");
+    }
+  }
+
+  function clearAll() {
+    setRows([emptyRow()]);
+    localStorage.removeItem("scrapeQueries");
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setErr("");
+    const valid = rows.filter((r) => r.query.trim().length > 0);
+    if (!valid.length)
+      return setErr("Ajoute au moins une requête (champ 'query').");
+    onSubmit?.({ queries: valid });
+  }
+
+  // Styles
+  const overlayStyle = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.35)",
+    zIndex: 1000,
+    display: "flex",
+    alignItems: isMobile ? "stretch" : "center",
+    justifyContent: "center",
+  };
+
+  const sheetStyle = isMobile
+    ? {
+        width: "80%",
+        height: "90%",
+        top: 25,
+        position: "absolute",
+        background: "#fff",
+        borderRadius: 0,
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto",
+        paddingTop: "max(12px, env(safe-area-inset-top))",
+        paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+      }
+    : {
+        background: "#fff",
+        border: "1px solid #eee",
+        borderRadius: 12,
+        width: "min(900px, 92vw)",
+        maxHeight: "82vh",
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto",
+      };
+
+  const headerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: isMobile ? "12px 14px" : "14px 16px",
+    borderBottom: "1px solid #f0f0f0",
+    position: "sticky",
+    top: 0,
+    background: "#fff",
+    zIndex: 1,
+  };
+
+  const titleStyle = {
+    margin: 0,
+    fontSize: isMobile ? 18 : 20,
+    fontWeight: 700,
+  };
+
+  const contentStyle = {
+    padding: isMobile ? "12px 14px" : "16px",
+    overflow: "auto",
+    width: "90%",
+    WebkitOverflowScrolling: "touch",
+    display: "grid",
+    gap: 12,
+  };
+
+  const footerStyle = {
+    position: isMobile ? "sticky" : "static",
+    bottom: 0,
+    padding: isMobile ? "10px 14px" : "14px 16px",
+    borderTop: "1px solid #f0f0f0",
+    background: "#fff",
+    display: "flex",
+    gap: 8,
+    justifyContent: "space-between",
+  };
+
+  const fieldLabel = {
+    fontSize: 12,
+    opacity: 0.75,
+    marginBottom: 6,
+    marginTop: 9,
+  };
+  const inputStyle = {
+    width: "100%",
+    padding: isMobile ? "12px" : "10px",
+    borderRadius: 10,
+    border: "1px solid #ddd",
+    outline: "none",
+    fontSize: isMobile ? 16 : 14,
+    WebkitTapHighlightColor: "transparent",
+  };
+  const selectStyle = { ...inputStyle, background: "#fff" };
+
+  return (
+    <div
+      style={overlayStyle}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <form
+        onSubmit={submit}
+        style={sheetStyle}
+        onKeyDown={(e) => {
+          if (
+            e.key === "Enter" &&
+            (e.target.tagName === "INPUT" || e.target.tagName === "SELECT")
+          ) {
+            if (!(e.metaKey || e.ctrlKey)) e.preventDefault();
+          }
+        }}
+      >
+        {/* Header */}
+        <div></div>
+        <div style={headerStyle}>
+          <h3 style={titleStyle}>Search Jobs</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              border: "1px solid #ddd",
+              background: "#fafafa",
+              borderRadius: 10,
+              padding: "8px 12px",
+            }}
+            aria-label="Close"
+          >
+            Close
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={contentStyle}>
+          {rows.map((r, i) => (
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gap: 10,
+                padding: isMobile ? 10 : 12,
+                border: "1px solid #eee",
+                borderRadius: 12,
+              }}
+            >
+              {/* Fields */}
+              <div></div>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 10,
+                  gridTemplateColumns: "1fr",
+                }}
+              >
+                <div>
+                  <div style={{ ...fieldLabel, marginTop: 0 }}>Title’s Job</div>
+
+                  <div style={{ display: "flex" }}>
+                    <input
+                      inputMode="search"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      placeholder='ex: "Dev", "Alternance", "..."'
+                      value={r.query}
+                      onChange={(e) => update(i, { query: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={fieldLabel}>Place</div>
+                  <div style={{ display: "flex" }}>
+                    <input
+                      inputMode="text"
+                      autoCapitalize="words"
+                      placeholder='ex: "Paris", "Remote FR"'
+                      value={r.where}
+                      onChange={(e) => update(i, { where: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr" }}
+              >
+                <div>
+                  <div>
+                    <div style={fieldLabel}>Work mode</div>
+                    <select
+                      value={r.remote}
+                      onChange={(e) => update(i, { remote: e.target.value })}
+                      style={selectStyle}
+                    >
+                      <option value="any">Any</option>
+                      <option value="remote">Remote</option>
+                      <option value="onsite">On-site</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div style={fieldLabel}>Posted since (days)</div>
+                    <div style={{ display: "flex" }}>
+                      <input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        placeholder="7"
+                        value={r.sinceDays}
+                        onChange={(e) =>
+                          update(i, { sinceDays: Number(e.target.value || 0) })
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={fieldLabel}>Results</div>
+                    <div style={{ display: "flex" }}>
+                      <input
+                        type="number"
+                        min={0}
+                        step={10}
+                        max={100}
+                        inputMode="numeric"
+                        placeholder="10"
+                        value={r.results}
+                        onChange={(e) =>
+                          update(i, { results: Number(e.target.value || 10) })
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={fieldLabel}>Min salary</div>
+                    <div style={{ display: "flex" }}>
+                      <input
+                        type="text"
+                        inputMode="text"
+                        autoCapitalize="characters"
+                        placeholder="ex: 45k"
+                        value={r.minSalary}
+                        onChange={(e) =>
+                          update(i, { minSalary: e.target.value })
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {err && <div style={{ color: "crimson", fontSize: 13 }}>{err}</div>}
+        </div>
+
+        {/* Footer */}
+        <div style={footerStyle}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={saveDraft}
+              style={{
+                border: "1px solid #ddd",
+                background: "#fff",
+                borderRadius: 10,
+                padding: "10px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Save draft
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              style={{
+                border: "1px solid #ddd",
+                background: "#fff",
+                borderRadius: 10,
+                padding: "10px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              border: "1px solid #222",
+              background: loading ? "#eaeaea" : "#111",
+              color: loading ? "#666" : "#fff",
+              fontWeight: 600,
+            }}
+          >
+            {loading ? "…" : "Run search"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
