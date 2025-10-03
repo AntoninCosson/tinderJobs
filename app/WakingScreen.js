@@ -49,8 +49,8 @@ useEffect(() => {
     async function tick() {
       try {
         const [r1, r2] = await Promise.allSettled([
-          fetch("/api/n8n-health", { cache: "no-store" }),
-          fetch("/api/py-health",  { cache: "no-store" }),
+          fetch("/api/n8n-healthz", { cache: "no-store" }),
+          fetch("/api/py-healthz",  { cache: "no-store" }),
         ]);
 
         if (stop) return;
