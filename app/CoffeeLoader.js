@@ -127,9 +127,9 @@ export default function CoffeeLoader({
         {filledMask.map((r, i) => (
           <Row key={i} mode={r.mode} step={r.step} />
         ))}
-        <div className="line">{ "  `-----&#39;  " }</div>
-        <div className="line">{" _________ "}</div>
-        <div className="line">{ "   `---------&#39;" }</div>
+        <div className="line">{ "   `-----" }{ "\u0027" }{ "  " }</div>
+        <div className="line">{"  _________ "}</div>
+        <div className="line">{ " `---------" }{ "\u0027" }</div>
       </div>
 
       <style jsx>{`

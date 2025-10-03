@@ -50,7 +50,7 @@ useEffect(() => {
       try {
         const [r1, r2] = await Promise.allSettled([
           fetch("/api/n8n-healthz", { cache: "no-store" }),
-          fetch("/api/py-healthz",  { cache: "no-store" }),
+          fetch("/api/py-health",  { cache: "no-store" }),
         ]);
 
         if (stop) return;
