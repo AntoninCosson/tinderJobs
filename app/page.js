@@ -8,7 +8,7 @@ import Hub from "@/app/Hub";
 import AppContent from "@/app/AppContent";
 
 export default function Page() {
-  const [stage, setStage] = useState("checking"); // checking → auth → waking → hub → ready
+  const [stage, setStage] = useState("checking");
   const [showAuth, setShowAuth] = useState(false);
   const [authed, setAuthed] = useState(false);
 
@@ -38,25 +38,6 @@ export default function Page() {
     };
   }, []);
 
-  useEffect(() => {
-    if (stage !== "waking") return;
-    let stop = false;
-    (async function poll() {
-      while (!stop) {
-        try {
-          const r = await fetch("/api/n8n-health", { cache: "no-store" });
-          if (r.ok) {
-            setStage("hub");
-            return;
-          }
-        } catch {}
-        await new Promise((res) => setTimeout(res, 3000));
-      }
-    })();
-    return () => {
-      stop = true;
-    };
-  }, [stage]);
 
   async function handleLogout() {
     await fetch("/api/signout", { method: "POST" });
@@ -82,7 +63,7 @@ export default function Page() {
   }
 
   if (stage === "checking") return null;
-  if (stage === "waking") return <WakingScreen />;
+  if (stage === "waking") return <WakingScreen onReady={() => setStage("hub")} />;
 
   if (stage === "auth") {
     return (

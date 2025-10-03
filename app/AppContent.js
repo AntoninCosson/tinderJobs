@@ -39,6 +39,16 @@ export default function ReviewPage({ authed }) {
   const [sending, setSending] = useState(false);
   const [sentInfo, setSentInfo] = useState(null);
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = () => setIsMobile(mq.matches);
+    handler();
+    mq.addEventListener?.("change", handler);
+    return () => mq.removeEventListener?.("change", handler);
+  }, []);
+
   useEffect(() => {
     setHydrated(true);
     try {
@@ -50,7 +60,7 @@ export default function ReviewPage({ authed }) {
   useEffect(() => {
     if (!authed) return;
     const ac = new AbortController();
-    
+
     async function loadData() {
       refreshUserStatuses("default");
       try {
@@ -95,7 +105,7 @@ export default function ReviewPage({ authed }) {
       }
     }
     loadData();
-    return () => ac.abort()
+    return () => ac.abort();
   }, [authed, isUpload]);
 
   const resetSwipesOnly = async () => {
@@ -242,7 +252,7 @@ export default function ReviewPage({ authed }) {
       setSending(true);
       setSentInfo(null);
 
-      const ids = (mongoPreview.queued ?? []).map(idObj => getDraftId(idObj));
+      const ids = (mongoPreview.queued ?? []).map((idObj) => getDraftId(idObj));
 
       const res = await fetch(`/api/sendApproved`, {
         method: "POST",
@@ -262,7 +272,9 @@ export default function ReviewPage({ authed }) {
       if (!res.ok || !json?.ok)
         throw new Error(json?.error || `HTTP ${res.status}`);
 
-      const receivedIds = Array.isArray(json.receivedIds) ? json.receivedIds : [];
+      const receivedIds = Array.isArray(json.receivedIds)
+        ? json.receivedIds
+        : [];
 
       const acceptedDrafts = selectionList.map((o) => ({
         id: getDraftId(o),
@@ -311,7 +323,7 @@ export default function ReviewPage({ authed }) {
           /* noop */
         });
 
-        if (receivedIds.length !== 0) {
+      if (receivedIds.length !== 0) {
         const ids = selectionList.map((o) => getDraftId(o));
         const res2 = await fetch("/api/status", {
           method: "PATCH",
@@ -330,7 +342,9 @@ export default function ReviewPage({ authed }) {
         await refreshOffersFromMongo("default");
         console.log("[handleSend] bulk status:", res2.status, j2);
       } else {
-        console.warn("[handleSend] aucun ack webhook → pas de passage en 'sent'");
+        console.warn(
+          "[handleSend] aucun ack webhook → pas de passage en 'sent'"
+        );
       }
 
       clearSelection();
@@ -356,6 +370,8 @@ export default function ReviewPage({ authed }) {
           justifyContent: "center",
           alignItems: "center",
           marginTop: 0,
+          position: isMobile ? "absolute" : "static",
+          top: isMobile ? -22 : "",
         }}
       >
         <div
@@ -443,26 +459,6 @@ export default function ReviewPage({ authed }) {
               // top: "30%",
             }}
           >
-            <button
-              onClick={() => {
-                console.log("OfferSelected:", selectionList);
-                handleSend();
-              }}
-              disabled={
-                sending || (mongoPreview.queued?.length ?? 0) === 0
-              }
-              style={{
-                zIndex: 10,
-                fontSize: "19px",
-                padding: "7%",
-                color: "black",
-              }}
-            >
-              {sending
-                ? "Envoi en cours..."
-                : `Envoyer selection (${mongoPreview.queued?.length ?? 0})`}
-            </button>
-
             <div
               style={{
                 display: "flex",
@@ -472,6 +468,23 @@ export default function ReviewPage({ authed }) {
                 zIndex: 10,
               }}
             >
+              <button
+                onClick={() => {
+                  console.log("OfferSelected:", selectionList);
+                  handleSend();
+                }}
+                disabled={sending || (mongoPreview.queued?.length ?? 0) === 0}
+                style={{
+                  zIndex: 10,
+                  fontSize: "19px",
+                  padding: "7%",
+                  color: "black",
+                }}
+              >
+                {sending
+                  ? "Envoi en cours..."
+                  : `Envoyer selection (${mongoPreview.queued?.length ?? 0})`}
+              </button>
               <button
                 style={{ fontSize: "15px", padding: "5%", color: "black" }}
                 onClick={() => setShowAcceptedPreview((v) => !v)}
