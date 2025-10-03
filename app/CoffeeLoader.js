@@ -1,27 +1,25 @@
 "use client";
 import { useEffect, useRef, useState, Fragment } from "react";
 
-
 export default function CoffeeLoader({
   awakeCount = 0,
   speed = 0.03,
   intervalMs = 60,
 }) {
-
   const [anim, setAnim] = useState(0);
   const targetRef = useRef(0);
   const [phase, setPhase] = useState(0);
 
-useEffect(() => {
-  const id = setInterval(() => {
-    setPhase((p) => (p + speed) % 1);
-  }, intervalMs);
-  return () => clearInterval(id);
-}, [speed, intervalMs]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPhase((p) => (p + speed) % 1);
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [speed, intervalMs]);
 
-useEffect(() => {
-  if (awakeCount === 0) setPhase(0);
-}, [awakeCount]);
+  useEffect(() => {
+    if (awakeCount === 0) setPhase(0);
+  }, [awakeCount]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -38,21 +36,21 @@ useEffect(() => {
   const FIXED_ROWS = 3;
   const width = 5;
 
-  const BLOCKS = [' ', '▁','▂','▃','▄','▅','▆','▇','█'];
+  const BLOCKS = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
   const STEPS = BLOCKS.length - 1;
 
   const level = awakeCount === 0 ? phase : 0.5 + 0.5 * phase;
 
   const totalSteps = level * FIXED_ROWS * STEPS;
-  const fullLines   = Math.floor(totalSteps / STEPS);
-  const stepInLine  = Math.floor(totalSteps % STEPS);
-  
+  const fullLines = Math.floor(totalSteps / STEPS);
+  const stepInLine = Math.floor(totalSteps % STEPS);
+
   const Row = ({ mode, step }) => {
     let ch;
-    if (mode === "full")      ch = '█';
-    else if (mode === "empty") ch = ' ';
-    else                      ch = BLOCKS[step];
-  
+    if (mode === "full") ch = "█";
+    else if (mode === "empty") ch = " ";
+    else ch = BLOCKS[step];
+
     return (
       <div className="line">
         {"  |"}
@@ -64,32 +62,35 @@ useEffect(() => {
 
   const rowsFixed = Array.from({ length: FIXED_ROWS }, (_, idxFromBottom) => {
     if (idxFromBottom < fullLines) return { mode: "full", step: 0 };
-    if (idxFromBottom === fullLines && stepInLine > 0) return { mode: "partial", step: stepInLine };
+    if (idxFromBottom === fullLines && stepInLine > 0)
+      return { mode: "partial", step: stepInLine };
     return { mode: "empty", step: 0 };
   }).reverse();
-
-  // const filledRows = Math.max(
-  //   0,
-  //   Math.min(rowsTotal, Math.ceil(rowsTotal * anim))
-  // );
-
 
   const FillRow = ({ filled }) => (
     <div className="line">
       {"  |"}
       {filled ? (
-          <span className="liquid" style={{
+        <span
+          className="liquid"
+          style={{
             display: "inline-block",
-            lineHeight:0,
-          }}>
-            <span className="coffee"   style={{
+            lineHeight: 0,
+          }}
+        >
+          <span
+            className="coffee"
+            style={{
               display: "inline-block",
               transform: "scaleY(0.2)",
               transformOrigin: "bottom",
-              lineHeight: 0, 
+              lineHeight: 0,
               verticalAlign: "baseline",
-              color: "#6b4226"
-            }}>{"▄".repeat(width)}</span>
+              color: "#6b4226",
+            }}
+          >
+            {"▄".repeat(width)}
+          </span>
         </span>
       ) : (
         " ".repeat(width)
@@ -98,10 +99,10 @@ useEffect(() => {
     </div>
   );
 
-  // masque bas → haut
   const filledMask = Array.from({ length: FIXED_ROWS }, (_, idxFromBottom) => {
     if (idxFromBottom < fullLines) return { mode: "full", step: 0 };
-    if (idxFromBottom === fullLines && stepInLine > 0) return { mode: "partial", step: stepInLine };
+    if (idxFromBottom === fullLines && stepInLine > 0)
+      return { mode: "partial", step: stepInLine };
     return { mode: "empty", step: 0 };
   }).reverse();
 
@@ -123,10 +124,12 @@ useEffect(() => {
       {/* mug */}
       <div className="mug" aria-hidden>
         <div className="line"> +-----+</div>
-        {filledMask.map((r, i) => <Row key={i} mode={r.mode} step={r.step} />)}
-        <div className="line">  `-----' </div>
-        <div className="line"> _________</div>
-        <div className="line"> `---------'</div>
+        {filledMask.map((r, i) => (
+          <Row key={i} mode={r.mode} step={r.step} />
+        ))}
+        <div className="line">{ "   `-----'  " }</div>
+        <div className="line">{" _________ "}</div>
+        <div className="line">{" `---------' "}</div>
       </div>
 
       <style jsx>{`

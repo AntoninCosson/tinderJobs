@@ -104,6 +104,7 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
     weeksInterval,
     monthsInterval,
     monthlyDays,
+    DOWS,
   ]);
 
   useEffect(() => {
