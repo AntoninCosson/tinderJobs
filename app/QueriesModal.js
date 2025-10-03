@@ -16,7 +16,10 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
   const [isMobile, setIsMobile] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState("");
   const hasValid = rows.some((r) => r.query.trim().length > 0);
+  const [savedSets, setSavedSets] = useState([]);
+  const [selectedSetId, setSelectedSetId] = useState("");
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
@@ -24,6 +27,22 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     handler();
     mq.addEventListener?.("change", handler);
     return () => mq.removeEventListener?.("change", handler);
+  }, []);
+
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/querysets", { cache: "no-store" });
+        const j = await r.json().catch(() => ({}));
+        if (!stop && r.ok && j?.ok && Array.isArray(j.data)) {
+          setSavedSets(j.data);
+        }
+      } catch {}
+    })();
+    return () => {
+      stop = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -104,7 +123,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       background: "#fff",
       cursor: "pointer",
       userSelect: "none",
-      transform: isMobile ? "scale(0.7)" : "scale(0.6)", 
+      transform: isMobile ? "scale(0.7)" : "scale(0.6)",
     };
     const wrap = {
       display: "inline-flex",
@@ -306,6 +325,55 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                   gridTemplateColumns: "1fr",
                 }}
               >
+                <div>
+                  <div style={fieldLabel}>Use a draft</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select
+                      value={selectedSetId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSelectedSetId(id);
+                        const sel = savedSets.find((s) => s._id === id);
+                        if (sel) {
+                          setEditingName(sel.name || "");
+                          const normalized = (sel.queries || []).map((r) => ({
+                            ...r,
+                            sinceDays: Number(r?.sinceDays ?? 0) || 0,
+                            results: Number(r?.results ?? 0) || 0,
+                            remote: r?.remote || "any",
+                            query: r?.query || "",
+                            where: r?.where || "",
+                            minSalary: r?.minSalary || "",
+                          }));
+                          setRows(
+                            normalized.length ? normalized : [emptyRow()]
+                          );
+                          setIsSaved(true);
+                        }
+                      }}
+                      style={{ ...inputStyle, background: "#fff" }}
+                    >
+                      <option value="">Select a draft</option>
+                      {savedSets.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name || s._id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <div style={fieldLabel}>Queries Set's Name</div>
+                  <div style={{ display: "flex" }}>
+                    <input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      placeholder="My search"
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <div style={{ ...fieldLabel, marginTop: 0 }}>Title’s Job</div>
 
