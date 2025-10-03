@@ -2,7 +2,7 @@
 import ClientProviders from "./ClientProviders";
 
 export const metadata = {
-  title: "Ma Landing",
+  title: "Tinder-Jobs",
   description: "Demo Next.js App Router",
 };
 
