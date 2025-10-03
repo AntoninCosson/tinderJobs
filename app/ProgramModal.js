@@ -11,6 +11,16 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
   // responsive
   const [isMobile, setIsMobile] = useState(false);
 
+  const DOWS = [
+    { key: "sun", label: "Dim", cron: 0, full: "dimanche" },
+    { key: "mon", label: "Lun", cron: 1, full: "lundi" },
+    { key: "tue", label: "Mar", cron: 2, full: "mardi" },
+    { key: "wed", label: "Mer", cron: 3, full: "mercredi" },
+    { key: "thu", label: "Jeu", cron: 4, full: "jeudi" },
+    { key: "fri", label: "Ven", cron: 5, full: "vendredi" },
+    { key: "sat", label: "Sam", cron: 6, full: "samedi" },
+  ];
+
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
     const handler = () => setIsMobile(mq.matches);
@@ -24,15 +34,6 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
 
   const [daysInterval, setDaysInterval] = useState(1);
 
-  const DOWS = [
-    { key: "sun", label: "Dim", cron: 0, full: "dimanche" },
-    { key: "mon", label: "Lun", cron: 1, full: "lundi" },
-    { key: "tue", label: "Mar", cron: 2, full: "mardi" },
-    { key: "wed", label: "Mer", cron: 3, full: "mercredi" },
-    { key: "thu", label: "Jeu", cron: 4, full: "jeudi" },
-    { key: "fri", label: "Ven", cron: 5, full: "vendredi" },
-    { key: "sat", label: "Sam", cron: 6, full: "samedi" },
-  ];
   const [weeklyDays, setWeeklyDays] = useState(new Set([1, 2, 3, 4, 5]));
   const [weeksInterval, setWeeksInterval] = useState(1);
 
