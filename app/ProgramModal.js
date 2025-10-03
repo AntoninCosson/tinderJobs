@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import QueryPickerModal from "@/app/QueryPickerModal";
+import Calendar from "@/app/Calendar";
 
-export default function ProgramModal({ onClose, onSubmit, loading }) {
-  const [cron, setCron] = useState("0 9 * * 1-5");
+export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
+  // queries modal
   const [queries, setQueries] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
-  const [err, setErr] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
 
+  // responsive
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
@@ -18,16 +19,195 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
     return () => mq.removeEventListener?.("change", handler);
   }, []);
 
+  const [mode, setMode] = useState("daily");
+  const [time, setTime] = useState("09:00");
+
+  const [daysInterval, setDaysInterval] = useState(1);
+
+  const DOWS = [
+    { key: "sun", label: "Dim", cron: 0, full: "dimanche" },
+    { key: "mon", label: "Lun", cron: 1, full: "lundi" },
+    { key: "tue", label: "Mar", cron: 2, full: "mardi" },
+    { key: "wed", label: "Mer", cron: 3, full: "mercredi" },
+    { key: "thu", label: "Jeu", cron: 4, full: "jeudi" },
+    { key: "fri", label: "Ven", cron: 5, full: "vendredi" },
+    { key: "sat", label: "Sam", cron: 6, full: "samedi" },
+  ];
+  const [weeklyDays, setWeeklyDays] = useState(new Set([1, 2, 3, 4, 5]));
+  const [weeksInterval, setWeeksInterval] = useState(1);
+
+  const [dom, setDom] = useState(1);
+  const [monthsInterval, setMonthsInterval] = useState(1);
+  const [monthlyDays, setMonthlyDays] = useState(new Set([1]));
+  const [showCalendar, setShowCalendar] = useState(false);
+
+
+  const cron = useMemo(() => {
+    const [hh, mm] = (time || "09:00").split(":").map((n) => parseInt(n, 10));
+    const H = Number.isFinite(hh) ? hh : 9;
+    const M = Number.isFinite(mm) ? mm : 0;
+
+    if (mode === "daily") {
+      const d = Math.max(1, Number(daysInterval) || 1);
+      return `${M} ${H} */${d} * *`;
+    }
+
+    if (mode === "weekly") {
+      const list = Array.from(weeklyDays)
+        .sort((a, b) => a - b)
+        .join(",");
+      return `${M} ${H} * * ${list || "*"}`;
+    }
+
+    const mi = Math.max(1, Number(monthsInterval) || 1);
+    const daysList =
+      Array.from(monthlyDays)
+        .sort((a, b) => a - b)
+        .join(",") || "1";
+    return `${M} ${H} ${daysList} */${mi} *`;
+  }, [mode, time, daysInterval, weeklyDays, monthsInterval, monthlyDays]);
+
+
+  const humanText = useMemo(() => {
+    const [hh, mm] = (time || "09:00").split(":").map((n) => parseInt(n, 10));
+    const H = String(Number.isFinite(hh) ? hh : 9).padStart(2, "0");
+    const M = String(Number.isFinite(mm) ? mm : 0).padStart(2, "0");
+
+    if (mode === "daily") {
+      const n = Math.max(1, Number(daysInterval) || 1);
+      return `Tous les ${n} jour${n > 1 ? "s" : ""} à ${H}:${M}`;
+    }
+
+    if (mode === "weekly") {
+      const selected = Array.from(weeklyDays)
+        .sort((a, b) => a - b)
+        .map((d) => DOWS.find((x) => x.cron === d)?.full)
+        .filter(Boolean);
+
+      const jours = selected.length
+        ? selected.join(", ")
+        : "aucun jour sélectionné";
+
+      return weeksInterval > 1
+        ? `Toutes les ${weeksInterval} semaines, le(s) ${jours} à ${H}:${M}`
+        : `Chaque ${jours} à ${H}:${M}`;
+    }
+
+    const daysArr = Array.from(monthlyDays).sort((a, b) => a - b);
+    const daysLabel = daysArr.length ? daysArr.join(", ") : "—";
+    return `Le(s) ${daysLabel} tous les mois à ${H}:${M}`;
+  }, [
+    mode,
+    time,
+    daysInterval,
+    weeklyDays,
+    weeksInterval,
+    monthsInterval,
+    monthlyDays,
+  ]);
+
+  useEffect(() => {
+    if (!initial) return;
+    if (Array.isArray(initial.queries)) setQueries(initial.queries);
+    const m = initial.meta || {};
+    if (m.mode) setMode(m.mode);
+    if (m.time) setTime(m.time);
+    if (Array.isArray(m.weeklyDays)) setWeeklyDays(new Set(m.weeklyDays));
+    if (Array.isArray(m.monthlyDays)) setMonthlyDays(new Set(m.monthlyDays));
+    if (typeof m.daysInterval === "number") setDaysInterval(m.daysInterval);
+    if (typeof m.monthsInterval === "number") setMonthsInterval(m.monthsInterval);
+  }, [initial]);
+
+  const [err, setErr] = useState("");
+
   function handleSave(e) {
     e.preventDefault();
+    console.log("[ProgramModal] submit", { queries, cron });
     setErr("");
-    if (!queries || !Array.isArray(queries) || queries.length === 0) {
+    if (!queries?.length) {
       setErr("Choisis d’abord un set de requêtes.");
       return;
     }
-    onSubmit?.({ cron, queries });
+    onSubmit?.({
+      _id: initial?._id,
+      name: initial?.name || "Scheduled search",
+      cron,
+      queries,
+      meta: {
+        mode,
+        time,
+        daysInterval,
+        weeklyDays: Array.from(weeklyDays),
+        weeksInterval,
+        monthlyDays: Array.from(monthlyDays),
+        monthsInterval,
+      },
+    });
   }
 
+  function Stepper({
+    value,
+    onChange,
+    min = 1,
+    max = Infinity,
+    step = 1,
+    label,
+  }) {
+    const dec = () => onChange(Math.max(min, (value || 0) - step));
+    const inc = () => onChange(Math.min(max, (value || 0) + step));
+
+    const btn = {
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "1px solid #ddd",
+      background: "#fff",
+      cursor: "pointer",
+      userSelect: "none",
+    };
+    const wrap = {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      border: "1px solid #ddd",
+      borderRadius: 10,
+      padding: 6,
+      background: "#fafafa",
+    };
+    const display = {
+      minWidth: 44,
+      textAlign: "center",
+      fontWeight: 600,
+    };
+
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {label && <span style={{ fontSize: 12, opacity: 0.6 }}>{label}</span>}
+        <div style={wrap}>
+          <button
+            type="button"
+            onClick={dec}
+            disabled={value <= min}
+            style={btn}
+          >
+            –
+          </button>
+          <span aria-live="polite" style={display}>
+            {value}
+          </span>
+          <button
+            type="button"
+            onClick={inc}
+            disabled={value >= max}
+            style={btn}
+          >
+            +
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // styles
   const overlayStyle = {
     position: "fixed",
     inset: 0,
@@ -40,8 +220,8 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
   const sheetStyle = isMobile
     ? {
         width: "92%",
-        height: "92%",
-        top: 16,
+        height: "62%",
+        top: 136,
         position: "absolute",
         background: "#fff",
         borderRadius: 12,
@@ -52,7 +232,7 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
         background: "#fff",
         border: "1px solid #eee",
         borderRadius: 12,
-        width: "min(520px, 92vw)",
+        width: "min(560px, 92vw)",
         maxHeight: "82vh",
         display: "grid",
         gridTemplateRows: "auto 1fr auto",
@@ -69,9 +249,10 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
 
   const contentStyle = {
     padding: isMobile ? "12px 14px" : "16px",
-    overflow: "auto",
+    overflowY: "auto",
+    overflowX: "hidden",
     display: "grid",
-    gap: 12,
+    gap: 14,
   };
 
   const footerStyle = {
@@ -93,11 +274,8 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
     WebkitTapHighlightColor: "transparent",
   };
 
-  const fieldLabel = {
-    fontSize: 12,
-    opacity: 0.75,
-    marginBottom: 6,
-  };
+  const fieldLabel = { fontSize: 12, opacity: 0.75, marginBottom: 6 };
+  const smallNote = { fontSize: 12, opacity: 0.6 };
 
   return (
     <div
@@ -139,19 +317,144 @@ export default function ProgramModal({ onClose, onSubmit, loading }) {
 
         {/* Content */}
         <div style={contentStyle}>
-          <div>
-            <div style={fieldLabel}>CRON</div>
-            <input
-              placeholder="CRON (ex: 0 9 * * 1-5)"
-              value={cron}
-              onChange={(e) => setCron(e.target.value)}
-              style={inputStyle}
-            />
-            <div style={{ fontSize: 12, opacity: 0.6, marginTop: 6 }}>
-              Lundi–Vendredi à 09:00 → <code>0 9 * * 1-5</code>
+          {/* Recurrence builder */}
+          <div style={{ display: "grid", gap: 10 }}>
+            <div style={fieldLabel}>Recurrence</div>
+
+            {/* Mode + Time */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                style={{ ...inputStyle, width: "auto" }}
+              >
+                <option value="daily">Tous les X jours</option>
+                <option value="weekly">Jours de la semaine</option>
+                <option value="monthly">Tous les mois</option>
+              </select>
+
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                style={{ ...inputStyle, width: 140 }}
+              />
+            </div>
+
+            {/* Daily options */}
+            {mode === "daily" && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={smallNote}>Tous les</span>
+                <Stepper
+                  value={daysInterval}
+                  onChange={setDaysInterval}
+                  min={1}
+                />
+                <span style={smallNote}>jour(s)</span>
+              </div>
+            )}
+
+            {/* Weekly options */}
+            {mode === "weekly" && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {DOWS.map((d) => (
+                    <label
+                      key={d.key}
+                      style={{ display: "flex", gap: 6, alignItems: "center" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={weeklyDays.has(d.cron)}
+                        onChange={(e) => {
+                          setWeeklyDays((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(d.cron);
+                            else next.delete(d.cron);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>{d.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", gap: 8, alignItems: "center" }}
+                  >
+                    <span style={smallNote}>Toutes les semaines</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Monthly options */}
+            {mode === "monthly" && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    flexDirection: "column",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!showCalendar) {
+                        setShowCalendar(true);
+                        return;
+                      }
+                      if (monthlyDays.size === 0) {
+                        alert("Sélectionne au moins un jour du mois.");
+                        return;
+                      }
+                      setShowCalendar(false);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                      background: "#fafafa",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {!showCalendar ? "Choisir les jours du mois" : "Valider"}
+                  </button>
+
+                  {showCalendar && (
+                    <Calendar
+                      value={monthlyDays}
+                      onChange={(next) => setMonthlyDays(next)}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Human-friendly + Cron preview */}
+            <div style={{ marginTop: 4 }}>
+              <div style={fieldLabel}>Résumé</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                {humanText}
+                <br />
+                {/* <code style={{ opacity: 0.5 }}>{cron}</code> */}
+              </div>
             </div>
           </div>
 
+          {/* Queries chooser */}
           <div>
             <div style={fieldLabel}>Queries</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

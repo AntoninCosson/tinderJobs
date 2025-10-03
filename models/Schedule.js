@@ -1,6 +1,5 @@
 // models/Schedule.js
-import mongoose from "mongoose";
-import { Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const QuerySchema = new Schema(
   {
@@ -25,6 +24,7 @@ const ScheduleSchema = new Schema(
     cron: { type: String, required: true },
     queries: { type: [QuerySchema], default: [] },
     active: { type: Boolean, default: true },
+    meta: { type: Schema.Types.Mixed, default: {} },
 
     lastRunAt: Date,
     nextRunAt: Date,
