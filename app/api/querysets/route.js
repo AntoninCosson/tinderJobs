@@ -72,3 +72,37 @@ export async function POST(req) {
     return NextResponse.json({ ok:false, error: e.message || String(e) }, { status:500 });
   }
 }
+
+export async function DELETE(req) {
+  try {
+    await connectDB();
+    const userId = await getCurrentUserId(req);
+    if (!userId) {
+      return NextResponse.json({ ok:false, error:"unauthorized" }, { status:401 });
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+
+    let bodyId = null;
+    if (!id) {
+      const body = await req.json().catch(() => ({}));
+      bodyId = body?.id || null;
+    }
+    const _id = id || bodyId;
+
+    if (!_id) {
+      return NextResponse.json({ ok:false, error:"id required" }, { status:400 });
+    }
+
+    const r = await SavedQueriesSet.deleteOne({ _id: _id, userId });
+    if (r.deletedCount === 0) {
+      return NextResponse.json({ ok:false, error:"not found" }, { status:404 });
+    }
+
+    return NextResponse.json({ ok:true, deleted:r.deletedCount });
+  } catch (e) {
+    console.error("[querysets:DELETE]", e);
+    return NextResponse.json({ ok:false, error: e.message || String(e) }, { status:500 });
+  }
+}

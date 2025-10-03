@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { transform } from "typescript";
 
 const DEFAULT_ROW = {
   query: "",
@@ -15,6 +16,8 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [savedSets, setSavedSets] = useState([]);
   const [custom, setCustom] = useState([{ ...DEFAULT_ROW }]);
+  const [using, setUsing] = useState(false);
+  const [isUsingTheseQueries, setIsUsingTheseQueries] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
@@ -125,17 +128,45 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
         setSavedSets((prev) => [updatedDoc, ...prev]);
         setEditingId(updatedDoc._id);
       }
+      return true;
     } catch (e) {
       setErr(e.message || "Erreur lors de l’enregistrement");
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function useAndSave() {
+    if (loading || saving || using) return;
+    setErr("");
+    setUsing(true);
+    const ok = await saveChanges();
+    if (ok) {
+      submitCustom();
+    }
+    setUsing(false);
+    setIsUsingTheseQueries(true);
   }
 
   function updateCustom(i, patch) {
     setCustom((prev) =>
       prev.map((r, idx) => (idx === i ? normalizeQuery({ ...r, ...patch }) : r))
     );
+  }
+
+  async function deleteSavedSet(id) {
+    try {
+      const res = await fetch(`/api/querysets?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j?.ok === false)
+        throw new Error(j?.error || `HTTP ${res.status}`);
+      setSavedSets((prev) => prev.filter((s) => s._id !== id));
+    } catch (e) {
+      setErr(e.message || "Erreur lors de la suppression");
+    }
   }
 
   function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
@@ -160,6 +191,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
       background: "#fff",
       cursor: "pointer",
       userSelect: "none",
+      transform: isMobile ? "scale(0.7)" : "scale(0.6)", 
     };
     const wrap = {
       display: "inline-flex",
@@ -167,11 +199,13 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
       gap: 8,
       border: "1px solid #ddd",
       borderRadius: 10,
-      padding: 6,
+      padding: 1,
       background: "#fafafa",
+      height: isMobile ? 30 : 25,
     };
     const num = {
-      width: 56,
+      fontSize: 12,
+      width: 15,
       textAlign: "center",
       fontWeight: 600,
       border: "none",
@@ -384,6 +418,20 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                         >
                           Modify this set
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteSavedSet(s._id)}
+                          style={{
+                            padding: "6px 10px",
+                            border: "1px solid #ddd",
+                            borderRadius: 8,
+                            background: "#fff",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Remove
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -394,7 +442,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
 
           {tab === "custom" && (
             <form onSubmit={submitCustom} style={{ display: "grid", gap: 12 }}>
-              {editingId && (
+              {(editingId || custom) && (
                 <div>
                   <div style={fieldLabel}>Name</div>
                   <div style={{ display: "flex" }}>
@@ -488,15 +536,14 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                     <div>
                       <div style={fieldLabel}>Posted since (days)</div>
                       <div style={{ display: "flex" }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={r.sinceDays}
-                          onChange={(e) =>
-                            updateCustom(i, {
-                              sinceDays: Number(e.target.value || 0),
-                            })
+                        <Stepper
+                          value={
+                            typeof r.sinceDays === "number" ? r.sinceDays : 0
                           }
+                          onChange={(v) => updateCustom(i, { sinceDays: v })}
+                          min={0}
+                          max={30}
+                          step={1}
                         />
                       </div>
                     </div>
@@ -558,7 +605,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
             }}
           >
             <div style={{ display: "flex", gap: 8 }}>
-              {editingId && (
+              {editingId && !custom && (
                 <button
                   type="button"
                   onClick={saveChanges}
@@ -580,8 +627,8 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
             <button
               type="button"
               form="customForm"
-              disabled={loading}
-              onClick={submitCustom}
+              disabled={loading || saving || using}
+              onClick={useAndSave}
               style={{
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -591,7 +638,11 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                 fontWeight: 600,
               }}
             >
-              Use these queries
+              { using && custom
+                ? "Saving…"
+                : isUsingTheseQueries
+                ? "Using"
+                : "Use these queries"}
             </button>
           </div>
         ) : (

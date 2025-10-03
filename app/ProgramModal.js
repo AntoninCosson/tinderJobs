@@ -12,13 +12,13 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
   const [isMobile, setIsMobile] = useState(false);
 
   const DOWS = [
-    { key: "sun", label: "Dim", cron: 0, full: "dimanche" },
     { key: "mon", label: "Lun", cron: 1, full: "lundi" },
     { key: "tue", label: "Mar", cron: 2, full: "mardi" },
     { key: "wed", label: "Mer", cron: 3, full: "mercredi" },
     { key: "thu", label: "Jeu", cron: 4, full: "jeudi" },
     { key: "fri", label: "Ven", cron: 5, full: "vendredi" },
     { key: "sat", label: "Sam", cron: 6, full: "samedi" },
+    { key: "sun", label: "Dim", cron: 0, full: "dimanche" },
   ];
 
   useEffect(() => {
@@ -165,6 +165,7 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
       background: "#fff",
       cursor: "pointer",
       userSelect: "none",
+      transform: isMobile ? "scale(0.7)" : "scale(0.6)", 
     };
     const wrap = {
       display: "inline-flex",
@@ -172,13 +173,19 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
       gap: 8,
       border: "1px solid #ddd",
       borderRadius: 10,
-      padding: 6,
+      padding: 1,
       background: "#fafafa",
+      height: isMobile ? 30 : 25,
     };
     const display = {
-      minWidth: 44,
+      fontSize: 12,
+      width: 12,
       textAlign: "center",
       fontWeight: 600,
+      border: "none",
+      background: "transparent",
+      outline: "none",
+      pointerEvents: "none",
     };
 
     return (
@@ -450,8 +457,6 @@ export default function ProgramModal({ onClose, onSubmit, loading, initial }) {
               <div style={fieldLabel}>Résumé</div>
               <div style={{ fontSize: 12, opacity: 0.85 }}>
                 {humanText}
-                <br />
-                {/* <code style={{ opacity: 0.5 }}>{cron}</code> */}
               </div>
             </div>
           </div>

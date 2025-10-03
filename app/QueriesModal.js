@@ -14,6 +14,9 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
   const [rows, setRows] = useState([emptyRow()]);
   const [err, setErr] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const hasValid = rows.some((r) => r.query.trim().length > 0);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
@@ -50,43 +53,39 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       next[i] = { ...row, ...patch };
       return next;
     });
+    setIsSaved(false);
   }
 
   async function saveDraft() {
     setErr("");
+    setSaving(true);
     try {
       localStorage.setItem("scrapeQueries", JSON.stringify(rows));
-
       const name =
         (rows[0]?.query?.trim() || "Search") +
         " · " +
         new Date().toLocaleString();
-
       const res = await fetch("/api/querysets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          queries: rows,
-        }),
+        body: JSON.stringify({ name, queries: rows }),
       });
-
       const j = await res.json().catch(() => ({}));
-      if (!res.ok || j?.ok === false) {
+      if (!res.ok || j?.ok === false)
         throw new Error(j?.error || `HTTP ${res.status}`);
-      }
-
-      console.log("[saveDraft] OK, queryset id:", j.id);
+      setIsSaved(true);
     } catch (e) {
       console.error("[saveDraft] error:", e);
       setErr(e.message || "Erreur lors de l’enregistrement");
+    } finally {
+      setSaving(false);
     }
   }
 
   function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
     const v = Number.isFinite(Number(value)) ? Number(value) : 0;
     const clamp = (n) => Math.min(max, Math.max(min, n));
-  
+
     const dec = () => {
       const nv = clamp(v - step);
       // console.log("dec", v, "->", nv);
@@ -97,7 +96,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       // console.log("inc", v, "->", nv);
       onChange(nv);
     };
-  
+
     const btn = {
       padding: "8px 12px",
       borderRadius: 8,
@@ -105,6 +104,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       background: "#fff",
       cursor: "pointer",
       userSelect: "none",
+      transform: isMobile ? "scale(0.7)" : "scale(0.6)", 
     };
     const wrap = {
       display: "inline-flex",
@@ -112,11 +112,13 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       gap: 8,
       border: "1px solid #ddd",
       borderRadius: 10,
-      padding: 6,
+      padding: 1,
       background: "#fafafa",
+      height: isMobile ? 30 : 25,
     };
     const num = {
-      width: 56,
+      fontSize: 12,
+      width: 15,
       textAlign: "center",
       fontWeight: 600,
       border: "none",
@@ -124,14 +126,18 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       outline: "none",
       pointerEvents: "none",
     };
-  
+
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {label && <span style={{ fontSize: 12, opacity: 0.6 }}>{label}</span>}
         <div style={wrap}>
-          <button type="button" onClick={dec} disabled={v <= min} style={btn}>–</button>
+          <button type="button" onClick={dec} disabled={v <= min} style={btn}>
+            –
+          </button>
           <input readOnly value={v} style={num} aria-live="polite" />
-          <button type="button" onClick={inc} disabled={v >= max} style={btn}>+</button>
+          <button type="button" onClick={inc} disabled={v >= max} style={btn}>
+            +
+          </button>
         </div>
       </div>
     );
@@ -352,16 +358,14 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                   <div>
                     <div style={fieldLabel}>Posted since (days)</div>
                     <div style={{ display: "flex" }}>
-                      <input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        placeholder="7"
-                        value={r.sinceDays}
-                        onChange={(e) =>
-                          update(i, { sinceDays: Number(e.target.value || 0) })
+                      <Stepper
+                        value={
+                          typeof r.sinceDays === "number" ? r.sinceDays : 0
                         }
-                        style={inputStyle}
+                        onChange={(v) => update(i, { sinceDays: v })}
+                        min={0}
+                        max={365}
+                        step={1}
                       />
                     </div>
                   </div>
@@ -408,13 +412,16 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
               onClick={saveDraft}
               style={{
                 border: "1px solid #ddd",
-                background: "#fff",
+                background: isSaved ? "#f3f4f6" : "#fff",
+                color: isSaved ? "#6b7280" : "inherit",
                 borderRadius: 10,
                 padding: "10px 14px",
-                cursor: "pointer",
+                cursor:
+                  isSaved || saving || !hasValid ? "not-allowed" : "pointer",
+                opacity: isSaved || saving || !hasValid ? 0.7 : 1,
               }}
             >
-              Save draft
+              {saving ? "Saving…" : isSaved ? "Saved" : "Save draft"}
             </button>
             <button
               type="button"

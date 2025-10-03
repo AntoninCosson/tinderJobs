@@ -19,27 +19,12 @@ export default function Hub({ onMatch, onNotify }) {
     { cron: 6, full: "samedi" },
   ];
 
-//   useEffect(() => {
-//     (async () => {
-//       try {
-//         const r = await fetch("/api/schedule", { cache: "no-store" });
-//         const j = await r.json().catch(() => ({}));
-//         if (r.ok && j?.ok) {
-//           setSchedule(j.data?.[0] || null);
-//         //   if (!j.data?.[0]) setShowProgram(true);
-//         }
-//       } catch {}
-//     })();
-//   }, []);
-
 useEffect(() => {
-    // 1) lecture instant de sessionStorage (si WakingScreen l’a rempli)
     try {
       const cached = sessionStorage.getItem("schedule");
       if (cached) setSchedule(JSON.parse(cached));
     } catch {}
   
-    // 2) fetch de confirmation (rafraîchit et remet en cache)
     (async () => {
       try {
         const r = await fetch("/api/schedule", { cache: "no-store" });
