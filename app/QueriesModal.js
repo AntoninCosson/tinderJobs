@@ -363,7 +363,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                   </div>
                 </div>
                 <div>
-                  <div style={fieldLabel}>Queries Set's Name</div>
+                  <div style={fieldLabel}>Queries Set Name</div>
                   <div style={{ display: "flex" }}>
                     <input
                       value={editingName}

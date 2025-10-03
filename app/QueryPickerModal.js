@@ -444,7 +444,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
             <form onSubmit={submitCustom} style={{ display: "grid", gap: 12 }}>
               {(editingId || custom) && (
                 <div>
-                  <div style={fieldLabel}>Queries set's name</div>
+                  <div style={fieldLabel}>Queries set name</div>
                   <div style={{ display: "flex" }}>
                     <input
                       value={editingName}
