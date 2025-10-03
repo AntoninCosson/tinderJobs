@@ -26,7 +26,7 @@ export default function Hub({ onMatch, onNotify }) {
         const j = await r.json().catch(() => ({}));
         if (r.ok && j?.ok) {
           setSchedule(j.data?.[0] || null);
-          if (!j.data?.[0]) setShowProgram(true);
+        //   if (!j.data?.[0]) setShowProgram(true);
         }
       } catch {}
     })();
@@ -54,7 +54,7 @@ export default function Hub({ onMatch, onNotify }) {
       const r = await fetch("/api/scrape", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ queries }), // pas de userId ici
+        body: JSON.stringify({ queries }),
       });
 
       const d = await r.json().catch(() => ({}));
@@ -110,7 +110,7 @@ export default function Hub({ onMatch, onNotify }) {
     const r = await fetch(`/api/schedule/${schedule._id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ active: !schedule.active }), // 👈 bool
+      body: JSON.stringify({ active: !schedule.active }),
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j?.ok) {
