@@ -258,7 +258,7 @@ export default function Hub({ onMatch, onNotify }) {
               {schedule?.meta?.mode === "monthly" &&
                 `Le(s) ${(schedule?.meta?.monthlyDays ?? [])
                   .sort((a, b) => a - b)
-                  .join(", ")} à ${schedule?.meta?.time ?? "09:00"}`}
+                  .join(", ")} du mois, à ${schedule?.meta?.time ?? "09:00"}`}
               {!schedule?.meta?.mode && <code>{schedule?.cron}</code>}
             </div>
           </div>

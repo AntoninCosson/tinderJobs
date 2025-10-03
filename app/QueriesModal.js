@@ -26,14 +26,30 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("scrapeQueries") || "[]");
-      if (Array.isArray(saved) && saved.length) setRows(saved);
+      if (Array.isArray(saved) && saved.length) {
+        const normalized = saved.map((r) => ({
+          ...r,
+          sinceDays: Number(r?.sinceDays ?? 0) || 0,
+          results: Number(r?.results ?? 0) || 0,
+        }));
+        setRows(normalized);
+      }
     } catch {}
   }, []);
 
   function update(i, patch) {
-    setRows((prev) =>
-      prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
-    );
+    setRows((prev) => {
+      const next = prev.map((r) => ({ ...r }));
+      const row = next[i] ?? {};
+      if (patch.hasOwnProperty("sinceDays")) {
+        row.sinceDays = Number(patch.sinceDays ?? 0) || 0;
+      }
+      if (patch.hasOwnProperty("results")) {
+        row.results = Number(patch.results ?? 0) || 0;
+      }
+      next[i] = { ...row, ...patch };
+      return next;
+    });
   }
 
   async function saveDraft() {
@@ -65,6 +81,60 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       console.error("[saveDraft] error:", e);
       setErr(e.message || "Erreur lors de l’enregistrement");
     }
+  }
+
+  function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
+    const v = Number.isFinite(Number(value)) ? Number(value) : 0;
+    const clamp = (n) => Math.min(max, Math.max(min, n));
+  
+    const dec = () => {
+      const nv = clamp(v - step);
+      // console.log("dec", v, "->", nv);
+      onChange(nv);
+    };
+    const inc = () => {
+      const nv = clamp(v + step);
+      // console.log("inc", v, "->", nv);
+      onChange(nv);
+    };
+  
+    const btn = {
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "1px solid #ddd",
+      background: "#fff",
+      cursor: "pointer",
+      userSelect: "none",
+    };
+    const wrap = {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      border: "1px solid #ddd",
+      borderRadius: 10,
+      padding: 6,
+      background: "#fafafa",
+    };
+    const num = {
+      width: 56,
+      textAlign: "center",
+      fontWeight: 600,
+      border: "none",
+      background: "transparent",
+      outline: "none",
+      pointerEvents: "none",
+    };
+  
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {label && <span style={{ fontSize: 12, opacity: 0.6 }}>{label}</span>}
+        <div style={wrap}>
+          <button type="button" onClick={dec} disabled={v <= min} style={btn}>–</button>
+          <input readOnly value={v} style={num} aria-live="polite" />
+          <button type="button" onClick={inc} disabled={v >= max} style={btn}>+</button>
+        </div>
+      </div>
+    );
   }
 
   function clearAll() {
@@ -298,21 +368,13 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
 
                   <div>
                     <div style={fieldLabel}>Results</div>
-                    <div style={{ display: "flex" }}>
-                      <input
-                        type="number"
-                        min={0}
-                        step={10}
-                        max={100}
-                        inputMode="numeric"
-                        placeholder="10"
-                        value={r.results}
-                        onChange={(e) =>
-                          update(i, { results: Number(e.target.value || 10) })
-                        }
-                        style={inputStyle}
-                      />
-                    </div>
+                    <Stepper
+                      value={typeof r.results === "number" ? r.results : 0}
+                      onChange={(v) => update(i, { results: v })}
+                      min={0}
+                      max={100}
+                      step={10}
+                    />
                   </div>
 
                   <div>

@@ -46,6 +46,14 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
       .finally(() => setLoadingSaved(false));
   }, [tab]);
 
+  function normalizeQuery(q) {
+    return {
+      ...q,
+      sinceDays: Number(q?.sinceDays ?? 0) || 0,
+      results: Number(q?.results ?? 0) || 0,
+    };
+  }
+
   function pickSaved(queries) {
     if (!Array.isArray(queries) || !queries.length) {
       setErr("Ce queryset est vide.");
@@ -60,7 +68,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
       Array.isArray(s?.queries) && s.queries.length
         ? s.queries
         : [{ ...DEFAULT_ROW }];
-    setCustom(qs);
+    setCustom(qs.map(normalizeQuery));
     setEditingId(s?._id || null);
     setEditingName(s?.name || "Untitled");
     setErr("");
@@ -77,7 +85,6 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     onPick?.(valid);
     onClose?.();
   }
-
 
   async function saveChanges() {
     try {
@@ -125,11 +132,84 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     }
   }
 
+  function updateCustom(i, patch) {
+    setCustom((prev) =>
+      prev.map((r, idx) => (idx === i ? normalizeQuery({ ...r, ...patch }) : r))
+    );
+  }
 
+  function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
+    const v = Number.isFinite(Number(value)) ? Number(value) : 0;
+    const clamp = (n) => Math.min(max, Math.max(min, n));
 
+    const dec = () => {
+      const nv = clamp(v - step);
+      // console.log("dec", v, "->", nv);
+      onChange(nv);
+    };
+    const inc = () => {
+      const nv = clamp(v + step);
+      // console.log("inc", v, "->", nv);
+      onChange(nv);
+    };
 
+    const btn = {
+      padding: "8px 12px",
+      borderRadius: 8,
+      border: "1px solid #ddd",
+      background: "#fff",
+      cursor: "pointer",
+      userSelect: "none",
+    };
+    const wrap = {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      border: "1px solid #ddd",
+      borderRadius: 10,
+      padding: 6,
+      background: "#fafafa",
+    };
+    const num = {
+      width: 56,
+      textAlign: "center",
+      fontWeight: 600,
+      border: "none",
+      background: "transparent",
+      outline: "none",
+      pointerEvents: "none",
+    };
 
-  
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {label && <span style={{ fontSize: 12, opacity: 0.6 }}>{label}</span>}
+        <div style={wrap}>
+          <button type="button" onClick={dec} disabled={v <= min} style={btn}>
+            –
+          </button>
+          <input readOnly value={v} style={num} aria-live="polite" />
+          <button type="button" onClick={inc} disabled={v >= max} style={btn}>
+            +
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function update(i, patch) {
+    setRows((prev) => {
+      const next = prev.map((r) => ({ ...r }));
+      const row = next[i] ?? {};
+      if (patch.hasOwnProperty("sinceDays")) {
+        row.sinceDays = Number(patch.sinceDays ?? 0) || 0;
+      }
+      if (patch.hasOwnProperty("results")) {
+        row.results = Number(patch.results ?? 0) || 0;
+      }
+      next[i] = { ...row, ...patch };
+      return next;
+    });
+  }
 
   const overlayStyle = {
     position: "fixed",
@@ -339,7 +419,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                     gap: 8,
                   }}
                 >
-                <div></div>
+                  <div></div>
                   <div>
                     <div style={fieldLabel}>Title’s Job</div>
                     <div style={{ display: "flex" }}>
@@ -412,15 +492,11 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                           type="number"
                           min={0}
                           value={r.sinceDays}
-                          onChange={(e) => {
-                            const v = Number(e.target.value || 0);
-                            setCustom((prev) =>
-                              prev.map((x, idx) =>
-                                idx === i ? { ...x, sinceDays: v } : x
-                              )
-                            );
-                          }}
-                          style={inputStyle}
+                          onChange={(e) =>
+                            updateCustom(i, {
+                              sinceDays: Number(e.target.value || 0),
+                            })
+                          }
                         />
                       </div>
                     </div>
@@ -435,24 +511,13 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                   >
                     <div>
                       <div style={fieldLabel}>Results</div>
-                      <div style={{ display: "flex" }}>
-                        <input
-                          type="number"
-                          min={0}
-                          step={10}
-                          max={100}
-                          value={r.results}
-                          onChange={(e) => {
-                            const v = Number(e.target.value || 10);
-                            setCustom((prev) =>
-                              prev.map((x, idx) =>
-                                idx === i ? { ...x, results: v } : x
-                              )
-                            );
-                          }}
-                          style={inputStyle}
-                        />
-                      </div>
+                      <Stepper
+                        value={typeof r.results === "number" ? r.results : 0}
+                        onChange={(v) => updateCustom(i, { results: v })}
+                        min={0}
+                        max={100}
+                        step={10}
+                      />
                     </div>
                     <div>
                       <div style={fieldLabel}>Min salary</div>
@@ -482,55 +547,56 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
         </div>
 
         {tab === "custom" ? (
-  <div style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderBottom: "1px solid #f0f0f0",
-    background: "#fff",
-  }}>
-    <div style={{ display: "flex", gap: 8 }}>
-      {editingId && (
-        <button
-          type="button"
-          onClick={saveChanges}
-          disabled={saving}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #111",
-            background: "#111",
-            color: "#fff",
-            fontWeight: 600,
-          }}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-      )}
-    </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: 12,
+              borderBottom: "1px solid #f0f0f0",
+              background: "#fff",
+            }}
+          >
+            <div style={{ display: "flex", gap: 8 }}>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={saveChanges}
+                  disabled={saving}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #111",
+                    background: "#111",
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+              )}
+            </div>
 
-
-    <button
-      type="button"
-      form="customForm"
-      disabled={loading}
-      onClick={submitCustom}
-      style={{
-        padding: "10px 12px",
-        borderRadius: 8,
-        border: "1px solid #111",
-        background: "#111",
-        color: "#fff",
-        fontWeight: 600,
-      }}
-    >
-      Use these queries
-    </button>
-  </div>
-) : (
-  <div style={{ padding: 0 }} />
-)}
+            <button
+              type="button"
+              form="customForm"
+              disabled={loading}
+              onClick={submitCustom}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #111",
+                background: "#111",
+                color: "#fff",
+                fontWeight: 600,
+              }}
+            >
+              Use these queries
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: 0 }} />
+        )}
 
         <div style={footerStyle}>
           <div />
