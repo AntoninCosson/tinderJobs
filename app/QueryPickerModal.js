@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { transform } from "typescript";
 
 const DEFAULT_ROW = {
   query: "",
@@ -18,6 +17,8 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
   const [custom, setCustom] = useState([{ ...DEFAULT_ROW }]);
   const [using, setUsing] = useState(false);
   const [isUsingTheseQueries, setIsUsingTheseQueries] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const hasValid = custom.some((r) => (r?.query || "").trim().length > 0);
 
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
@@ -57,6 +58,20 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     };
   }
 
+  function splitName(name) {
+    if (typeof name !== "string") return { base: "", date: "" };
+    const i = name.lastIndexOf("·");
+    if (i === -1) return { base: name.trim(), date: "" };
+    return { base: name.slice(0, i).trim(), date: name.slice(i + 1).trim() };
+  }
+
+  function clearAll() {
+    setCustom([{ ...DEFAULT_ROW }]);
+    setEditingName("");
+    setIsSaved(false);
+    setErr("");
+  }
+
   function pickSaved(queries) {
     if (!Array.isArray(queries) || !queries.length) {
       setErr("Ce queryset est vide.");
@@ -73,7 +88,8 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
         : [{ ...DEFAULT_ROW }];
     setCustom(qs.map(normalizeQuery));
     setEditingId(s?._id || null);
-    setEditingName(s?.name || "Untitled");
+    const { base } = splitName(s?.name || "Untitled");
+    setEditingName(base);
     setErr("");
     setTab("custom");
   }
@@ -137,14 +153,73 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     }
   }
 
+  async function saveDraft() {
+    setErr("");
+    setSaving(true);
+    try {
+      localStorage.setItem("scrapeQueries", JSON.stringify(custom));
+      localStorage.setItem("scrapeQueriesName", editingName || "");
+
+      const baseName =
+        editingName?.trim() || custom[0]?.query?.trim() || "Search";
+      const now = new Date().toLocaleString();
+
+      const name = editingId
+        ? baseName.replace(/\s*·\s*[^·]+$/, "") + " · " + now
+        : baseName + " · " + now;
+
+      const isUpdate = Boolean(editingId);
+      const url = isUpdate
+        ? `/api/querysets/${encodeURIComponent(editingId)}`
+        : "/api/querysets";
+      const method = isUpdate ? "PATCH" : "POST";
+
+      const payload = { name, queries: custom };
+
+      const res = await fetch(url, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j?.ok === false) {
+        throw new Error(j?.error || `HTTP ${res.status}`);
+      }
+
+      const saved = j?.data || j;
+      const savedId = saved?._id || editingId;
+
+      setSavedSets((prev) => {
+        if (!savedId) return prev || [];
+        const next = Array.isArray(prev) ? [...prev] : [];
+        const idx = next.findIndex((s) => s._id === savedId);
+        const item = { ...(next[idx] || {}), ...(saved || payload) };
+        item._id = savedId;
+        if (idx >= 0) next[idx] = item;
+        else next.unshift(item);
+        return next;
+      });
+
+      if (!editingId && savedId) setEditingId(savedId);
+
+      setIsSaved(true);
+      return true;
+    } catch (e) {
+      console.error("[saveDraft] error:", e);
+      setErr(e.message || "Erreur lors de l’enregistrement");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function useAndSave() {
     if (loading || saving || using) return;
     setErr("");
     setUsing(true);
-    const ok = await saveChanges();
-    if (ok) {
-      submitCustom();
-    }
+    const ok = await saveDraft();
+    if (ok) submitCustom();
     setUsing(false);
     setIsUsingTheseQueries(true);
   }
@@ -153,6 +228,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     setCustom((prev) =>
       prev.map((r, idx) => (idx === i ? normalizeQuery({ ...r, ...patch }) : r))
     );
+    setIsSaved(false);
   }
 
   async function deleteSavedSet(id) {
@@ -191,7 +267,7 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
       background: "#fff",
       cursor: "pointer",
       userSelect: "none",
-      transform: isMobile ? "scale(0.7)" : "scale(0.6)", 
+      transform: isMobile ? "scale(0.7)" : "scale(0.6)",
     };
     const wrap = {
       display: "inline-flex",
@@ -230,20 +306,20 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     );
   }
 
-  function update(i, patch) {
-    setRows((prev) => {
-      const next = prev.map((r) => ({ ...r }));
-      const row = next[i] ?? {};
-      if (patch.hasOwnProperty("sinceDays")) {
-        row.sinceDays = Number(patch.sinceDays ?? 0) || 0;
-      }
-      if (patch.hasOwnProperty("results")) {
-        row.results = Number(patch.results ?? 0) || 0;
-      }
-      next[i] = { ...row, ...patch };
-      return next;
-    });
-  }
+  // function update(i, patch) {
+  //   setRows((prev) => {
+  //     const next = prev.map((r) => ({ ...r }));
+  //     const row = next[i] ?? {};
+  //     if (patch.hasOwnProperty("sinceDays")) {
+  //       row.sinceDays = Number(patch.sinceDays ?? 0) || 0;
+  //     }
+  //     if (patch.hasOwnProperty("results")) {
+  //       row.results = Number(patch.results ?? 0) || 0;
+  //     }
+  //     next[i] = { ...row, ...patch };
+  //     return next;
+  //   });
+  // }
 
   const overlayStyle = {
     position: "fixed",
@@ -317,6 +393,12 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     border: "1px solid #ddd",
   };
   const fieldLabel = { fontSize: 12, opacity: 0.75, marginBottom: 4 };
+
+  let saveLabel = "Save draft";
+  if (saving) saveLabel = "Saving…";
+  else if (isSaved && editingId) saveLabel = "Saved";
+  else if (!isSaved && editingId) saveLabel = "Save changes";
+  else if (isSaved && !editingId) saveLabel = "Saved";
 
   return (
     <div
@@ -448,7 +530,10 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                   <div style={{ display: "flex" }}>
                     <input
                       value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
+                      onChange={(e) => {
+                        setEditingName(e.target.value);
+                        setIsSaved(false);
+                      }}
                       placeholder="My search"
                       style={inputStyle}
                     />
@@ -473,14 +558,9 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                     <div style={{ display: "flex" }}>
                       <input
                         value={r.query}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setCustom((prev) =>
-                            prev.map((x, idx) =>
-                              idx === i ? { ...x, query: v } : x
-                            )
-                          );
-                        }}
+                        onChange={(e) =>
+                          updateCustom(i, { query: e.target.value })
+                        }
                         placeholder='ex: "Dev", "Alternance"…'
                         style={inputStyle}
                       />
@@ -492,14 +572,9 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                     <div style={{ display: "flex" }}>
                       <input
                         value={r.where}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setCustom((prev) =>
-                            prev.map((x, idx) =>
-                              idx === i ? { ...x, where: v } : x
-                            )
-                          );
-                        }}
+                        onChange={(e) =>
+                          updateCustom(i, { where: e.target.value })
+                        }
                         placeholder='ex: "Paris", "Remote FR"'
                         style={inputStyle}
                       />
@@ -517,14 +592,9 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                       <div style={fieldLabel}>Work mode</div>
                       <select
                         value={r.remote}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setCustom((prev) =>
-                            prev.map((x, idx) =>
-                              idx === i ? { ...x, remote: v } : x
-                            )
-                          );
-                        }}
+                        onChange={(e) =>
+                          updateCustom(i, { remote: e.target.value })
+                        }
                         style={{ ...inputStyle, background: "#fff" }}
                       >
                         <option value="any">Any</option>
@@ -571,14 +641,9 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
                       <div style={{ display: "flex" }}>
                         <input
                           value={r.minSalary}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setCustom((prev) =>
-                              prev.map((x, idx) =>
-                                idx === i ? { ...x, minSalary: v } : x
-                              )
-                            );
-                          }}
+                          onChange={(e) =>
+                            updateCustom(i, { minSalary: e.target.value })
+                          }
                           placeholder="ex: 45k"
                           style={inputStyle}
                         />
@@ -624,26 +689,64 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
               )}
             </div>
 
-            <button
-              type="button"
-              form="customForm"
-              disabled={loading || saving || using}
-              onClick={useAndSave}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid #111",
-                background: "#111",
-                color: "#fff",
-                fontWeight: 600,
-              }}
-            >
-              { using && custom
-                ? "Saving…"
-                : isUsingTheseQueries
-                ? "Using"
-                : "Use these queries"}
-            </button>
+            <div style={footerStyle}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await saveDraft();
+                    if (ok) {
+                      setTab("custom");
+                    }
+                  }}
+                  disabled={saving || !hasValid}
+                  style={{
+                    border: "1px solid #ddd",
+                    background: isSaved ? "#f3f4f6" : "#fff",
+                    color: isSaved ? "#6b7280" : "inherit",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    cursor: saving || !hasValid ? "not-allowed" : "pointer",
+                    opacity: saving || !hasValid ? 0.7 : 1,
+                  }}
+                >
+                  {saveLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  style={{
+                    border: "1px solid #ddd",
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear
+                </button>
+
+                <button
+                  type="button"
+                  disabled={loading || saving || using}
+                  onClick={useAndSave}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #111",
+                    background: loading || saving || using ? "#eaeaea" : "#111",
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                >
+                  {using
+                    ? "Saving…"
+                    : isUsingTheseQueries
+                    ? "Using"
+                    : "Use these queries"}
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div style={{ padding: 0 }} />
