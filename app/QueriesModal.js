@@ -56,6 +56,8 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
         }));
         setRows(normalized);
       }
+      const savedName = localStorage.getItem("scrapeQueriesName") || "";
+      setEditingName(savedName);
     } catch {}
   }, []);
 
@@ -80,18 +82,56 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     setSaving(true);
     try {
       localStorage.setItem("scrapeQueries", JSON.stringify(rows));
-      const name =
-        (rows[0]?.query?.trim() || "Search") +
-        " · " +
-        new Date().toLocaleString();
-      const res = await fetch("/api/querysets", {
-        method: "POST",
+      localStorage.setItem("scrapeQueriesName", editingName || "");
+
+      const baseName =
+        editingName?.trim() || rows[0]?.query?.trim() || "Search";
+      const now = new Date().toLocaleString();
+
+      let name;
+      if (selectedSetId) {
+        name = baseName.replace(/\s*·\s*[^·]+$/, "") + " · " + now;
+      } else {
+        name = baseName + " · " + now;
+      }
+
+      const isUpdate = Boolean(selectedSetId);
+      const url = isUpdate
+        ? `/api/querysets/${encodeURIComponent(selectedSetId)}`
+        : "/api/querysets";
+      const method = isUpdate ? "PATCH" : "POST";
+
+      const payload = { name, queries: rows };
+
+      const res = await fetch(url, {
+        method,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, queries: rows }),
+        body: JSON.stringify(payload),
       });
+
       const j = await res.json().catch(() => ({}));
-      if (!res.ok || j?.ok === false)
+      if (!res.ok || j?.ok === false) {
         throw new Error(j?.error || `HTTP ${res.status}`);
+      }
+
+      const saved = j?.data || j;
+      const savedId = saved?._id || selectedSetId;
+
+      setSavedSets((prev) => {
+        if (!savedId) return prev || [];
+        const next = Array.isArray(prev) ? [...prev] : [];
+        const idx = next.findIndex((s) => s._id === savedId);
+        const item = { ...(next[idx] || {}), ...(saved || payload) };
+        item._id = savedId;
+        if (idx >= 0) next[idx] = item;
+        else next.unshift(item);
+        return next;
+      });
+
+      if (!selectedSetId && savedId) {
+        setSelectedSetId(savedId);
+      }
+
       setIsSaved(true);
     } catch (e) {
       console.error("[saveDraft] error:", e);
@@ -101,18 +141,26 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     }
   }
 
+  function splitName(name) {
+    if (typeof name !== "string") return { base: "", date: "" };
+    const i = name.lastIndexOf("·");
+    if (i === -1) return { base: name.trim(), date: "" };
+    return {
+      base: name.slice(0, i).trim(),
+      date: name.slice(i + 1).trim(),
+    };
+  }
+
   function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
     const v = Number.isFinite(Number(value)) ? Number(value) : 0;
     const clamp = (n) => Math.min(max, Math.max(min, n));
 
     const dec = () => {
       const nv = clamp(v - step);
-      // console.log("dec", v, "->", nv);
       onChange(nv);
     };
     const inc = () => {
       const nv = clamp(v + step);
-      // console.log("inc", v, "->", nv);
       onChange(nv);
     };
 
@@ -263,7 +311,14 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     fontSize: isMobile ? 16 : 14,
     WebkitTapHighlightColor: "transparent",
   };
+
   const selectStyle = { ...inputStyle, background: "#fff" };
+
+  let saveLabel = "Save draft";
+  if (saving) saveLabel = "Saving…";
+  else if (isSaved && selectedSetId) saveLabel = "Saved";
+  else if (!isSaved && selectedSetId) saveLabel = "Save changes";
+  else if (isSaved && !selectedSetId) saveLabel = "Saved";
 
   return (
     <div
@@ -335,7 +390,9 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                         setSelectedSetId(id);
                         const sel = savedSets.find((s) => s._id === id);
                         if (sel) {
-                          setEditingName(sel.name || "");
+                          const { base } = splitName(sel.name || "");
+                          setEditingName(base);
+
                           const normalized = (sel.queries || []).map((r) => ({
                             ...r,
                             sinceDays: Number(r?.sinceDays ?? 0) || 0,
@@ -345,6 +402,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                             where: r?.where || "",
                             minSalary: r?.minSalary || "",
                           }));
+
                           setRows(
                             normalized.length ? normalized : [emptyRow()]
                           );
@@ -367,7 +425,10 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                   <div style={{ display: "flex" }}>
                     <input
                       value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
+                      onChange={(e) => {
+                        setEditingName(e.target.value);
+                        setIsSaved(false);
+                      }}
                       placeholder="My search"
                       style={inputStyle}
                     />
@@ -489,7 +550,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                 opacity: isSaved || saving || !hasValid ? 0.7 : 1,
               }}
             >
-              {saving ? "Saving…" : isSaved ? "Saved" : "Save draft"}
+              {saveLabel}
             </button>
             <button
               type="button"
