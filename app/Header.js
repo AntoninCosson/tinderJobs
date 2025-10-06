@@ -8,6 +8,7 @@ export default function Header({ onLogout, onHome }) {
         alignItems: "center",
         padding: "12px 16px",
         borderBottom: "1px solid #eee",
+        zIndex: 10000,
       }}
     >
       <button

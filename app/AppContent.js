@@ -62,14 +62,14 @@ export default function ReviewPage({ authed }) {
     const ac = new AbortController();
 
     async function loadData() {
-      refreshUserStatuses("default");
+      refreshUserStatuses();
       try {
         const ts = Date.now();
         const [offersRes, sentRes] = await Promise.all([
-          fetch(`/api/getOffers?userId=default&ts=${ts}`, {
+          fetch(`/api/getOffers?ts=${ts}`, {
             cache: "no-store",
           }),
-          fetch(`/api/alreadySent?userId=default&ts=${ts}`, {
+          fetch(`/api/alreadySent?ts=${ts}`, {
             cache: "no-store",
           }),
         ]);
@@ -124,7 +124,6 @@ export default function ReviewPage({ authed }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: "default",
           offerId: "*",
           status: "unread",
         }),
@@ -156,8 +155,8 @@ export default function ReviewPage({ authed }) {
     if (refetchTimerRef.current) return;
     refetchTimerRef.current = setTimeout(async () => {
       try {
-        await refreshOffersFromMongo("default");
-        await refreshUserStatuses("default");
+        await refreshOffersFromMongo();
+        await refreshUserStatuses();
       } finally {
         refetchTimerRef.current = null;
       }
@@ -183,13 +182,10 @@ export default function ReviewPage({ authed }) {
   // console.log("OfferLength", offers.length);
   // console.log("filt:", filteredOffers);
 
-  async function refreshUserStatuses(userId = "default") {
+  async function refreshUserStatuses() {
     try {
       const ts = Date.now();
-      const res = await fetch(
-        `/api/status?userId=${encodeURIComponent(userId)}&ts=${ts}`,
-        { cache: "no-store" }
-      );
+      const res = await fetch(`/api/status?ts=${ts}`);
       if (!res.ok) throw new Error(`status ${res.status}`);
       const j = await res.json();
       setMongoPreview(j?.data || { queued: [], rejected: [], sent: [] });
@@ -199,17 +195,14 @@ export default function ReviewPage({ authed }) {
     }
   }
 
-  async function refreshOffersFromMongo(userId = "default") {
+  async function refreshOffersFromMongo() {
     if (refreshInFlight.current) return;
     refreshInFlight.current = true;
     try {
       const ts = Date.now();
-      const res = await fetch(
-        `/api/getOffers?userId=${encodeURIComponent(userId)}&ts=${ts}`,
-        {
-          cache: "no-store",
-        }
-      );
+      const res = await fetch(`/api/getOffers?ts=${ts}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`getOffers ${res.status}`);
       const json = await res.json();
 
@@ -233,7 +226,6 @@ export default function ReviewPage({ authed }) {
       if (dir === "right") decidedRef.current.set(offerId, "queued");
       if (dir === "left") decidedRef.current.set(offerId, "rejected");
       const body = {
-        userId: "default",
         offerId,
         status: decidedRef.current.get(offerId),
       };
@@ -259,7 +251,6 @@ export default function ReviewPage({ authed }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: ids.map((id) => ({ id })),
-          userId: "default",
         }),
       });
 
@@ -298,7 +289,6 @@ export default function ReviewPage({ authed }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: "default",
           accepted: acceptedDrafts,
           rejected: rejectedDrafts,
         }),
@@ -313,11 +303,11 @@ export default function ReviewPage({ authed }) {
       if (!save.ok || !saved?.ok)
         throw new Error(saved?.error || `save ${save.status}`);
 
-      fetch("/api/alreadySent?userId=default")
+      fetch("/api/alreadySent")
         .then((r) => r.json())
         .then((j) => {
           setServerSent(j?.data ?? { accepted: [], rejected: [] });
-          console.log("/api/alreadySent?userId=default:", j);
+          console.log("/api/alreadySent:", j);
         })
         .catch(() => {
           /* noop */
@@ -329,7 +319,6 @@ export default function ReviewPage({ authed }) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId: "default",
             offerIds: receivedIds,
             status: "sent",
           }),
@@ -338,8 +327,8 @@ export default function ReviewPage({ authed }) {
         if (!res2.ok || j2?.ok === false) {
           throw new Error(j2?.error || `status PATCH ${res2.status}`);
         }
-        await refreshUserStatuses("default");
-        await refreshOffersFromMongo("default");
+        await refreshUserStatuses();
+        await refreshOffersFromMongo();
         console.log("[handleSend] bulk status:", res2.status, j2);
       } else {
         console.warn(

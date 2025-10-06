@@ -2,22 +2,23 @@
 import { connectDB } from "@/lib/db";
 import AlreadySent from "@/models/AlreadySent";
 import { NextResponse } from 'next/server';
+import { getCurrentUserId } from "@/lib/auth";
+
 export const runtime = 'nodejs';
 
 export const dynamic = "force-dynamic";
 
-// small helper: merge arrays of items by `id`, last write wins
 function mergeById(oldArr = [], newArr = []) {
   const byId = new Map(oldArr.map(x => [x.id, x]));
   for (const it of newArr) byId.set(it.id, { ...byId.get(it.id), ...it });
   return Array.from(byId.values());
 }
 
-// GET /api/alreadySent?userId=default
 export async function GET(req) {
   await connectDB();
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId") || "default";
+  const userId = await getCurrentUserId(req);
+  if (!userId) return NextResponse.json({ ok:false, error:"Not authenticated" }, { status:401 });  
   const doc = await AlreadySent.findOne({ userId }).lean();
   return NextResponse.json({
     ok: true,
@@ -25,29 +26,27 @@ export async function GET(req) {
   });
 }
 
-// POST /api/alreadySent
-// body: { userId: "default", accepted: [...], rejected: [...] }
+
 export async function POST(req) {
   try {
     await connectDB();
     const body = await req.json().catch(() => ({}));
-    const userId = body.userId || "default";
+    const userId = await getCurrentUserId(req);
+    if (!userId) return NextResponse.json({ ok:false, error:"Not authenticated" }, { status:401 });
+    
     const accepted = Array.isArray(body.accepted) ? body.accepted : [];
     const rejected = Array.isArray(body.rejected) ? body.rejected : [];
 
-    // fetch existing
     const existing = (await AlreadySent.findOne({ userId }).lean()) || {
       userId, accepted: [], rejected: [],
     };
 
-    // merge (dedupe by id)
     const next = {
       userId,
       accepted: mergeById(existing.accepted, accepted),
       rejected: mergeById(existing.rejected, rejected),
     };
 
-    // upsert
     const saved = await AlreadySent.findOneAndUpdate(
       { userId },
       { $set: next },

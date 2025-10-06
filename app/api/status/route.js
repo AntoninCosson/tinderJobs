@@ -3,12 +3,15 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import UserOffer from "@/models/UserOffer";
+import { getCurrentUserId } from "@/lib/auth";
 
 export async function GET(req) {
   try {
     await connectDB();
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") || "default";
+    const userId = await getCurrentUserId(req);
+    if (!userId) return NextResponse.json({ ok:false, error:"Not authenticated" }, { status:401 });
+    
 
     const doc = await UserOffer.findById(userId).lean();
     const offers = Array.isArray(doc?.offers) ? doc.offers : [];
@@ -32,7 +35,10 @@ export async function GET(req) {
 export async function PATCH(req) {
   try {
     await connectDB();
-    const { userId = "default", offerId, offerIds, status } = await req.json();
+    const { offerId, offerIds, status } = await req.json();
+    const userId = await getCurrentUserId(req);
+    if (!userId) return NextResponse.json({ ok:false, error:"Not authenticated" }, { status:401 });
+        
     console.log("[/api/status] payload:", { userId, offerId, offerIds, status });
 
     if (offerId === "*") {
