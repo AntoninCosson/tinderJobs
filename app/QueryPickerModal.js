@@ -36,7 +36,6 @@ export default function QueryPickerModal({ onClose, onPick, loading }) {
     return () => mq.removeEventListener?.("change", handler);
   }, []);
 
-  // Saved sets
   useEffect(() => {
     if (tab !== "saved") return;
     setLoadingSaved(true);

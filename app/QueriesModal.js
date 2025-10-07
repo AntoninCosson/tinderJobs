@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const emptyRow = () => ({
   query: "",
@@ -75,6 +75,51 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
       return next;
     });
     setIsSaved(false);
+  }
+
+  
+  async function runViaPython() {
+    try {
+      const valid = rows.filter((r) => (r?.query || "").trim().length);
+      if (!valid.length) {
+        console.warn("[PY] abort: no valid queries");
+        setErr("Ajoute au moins une requête (champ ‘Title’s Job’).");
+        return;
+      }
+
+      const payload = {
+        queries: valid,
+        options: { querySetName: editingName, sync: true },
+      };
+
+      console.log("[PY] POST /api/py/scrape", payload);
+
+      const res = await fetch("/api/py/scrape", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      console.log("[PY] proxy status:", res.status, "body:", j);
+
+      if (!res.ok || j?.ok === false) {
+        setErr(j?.error || `Scraper error (${res.status})`);
+        return;
+      }
+
+      if (j?.received?.dispatched || j?.dispatched) {
+        console.log(
+          "[PY] dispatched to n8n ✅ count:",
+          j?.received?.sent ?? j?.sent
+        );
+      } else {
+        console.log("[PY] accepted ✅ (no sync ack)");
+      }
+    } catch (e) {
+      console.error("[PY] submit error:", e);
+      setErr(e.message || String(e));
+    }
   }
 
   async function saveDraft() {
@@ -221,7 +266,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     const valid = rows.filter((r) => r.query.trim().length > 0);
     if (!valid.length)
       return setErr("Ajoute au moins une requête (champ 'query').");
-    onSubmit?.({ queries: valid });
+    onSubmit?.({ queries: valid, options: { querySetName: editingName } });
   }
 
   // Styles
@@ -569,6 +614,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
           <button
             type="submit"
             disabled={loading}
+            onClick={runViaPython}
             style={{
               padding: "12px 16px",
               borderRadius: 10,

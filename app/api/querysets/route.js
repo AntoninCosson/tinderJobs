@@ -45,13 +45,19 @@ export async function POST(req) {
     await connectDB();
     const userId = await getCurrentUserId(req);
     if (!userId)
-      return NextResponse.json({ ok:false, error:"unauthorized" }, { status:401 });
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
 
     const body = await req.json().catch(() => ({}));
     const { id, name = "Search", queries = [] } = body;
 
     if (!Array.isArray(queries) || queries.length === 0) {
-      return NextResponse.json({ ok:false, error:"queries[] required" }, { status:400 });
+      return NextResponse.json(
+        { ok: false, error: "queries[] required" },
+        { status: 400 }
+      );
     }
 
     let doc;
@@ -61,15 +67,22 @@ export async function POST(req) {
         { $set: { name, queries } },
         { new: true }
       );
-      if (!doc) return NextResponse.json({ ok:false, error:"not found" }, { status:404 });
+      if (!doc)
+        return NextResponse.json(
+          { ok: false, error: "not found" },
+          { status: 404 }
+        );
     } else {
       doc = await SavedQueriesSet.create({ userId, name, queries }); // <— ici
     }
 
-    return NextResponse.json({ ok:true, id: doc._id, data: doc });
+    return NextResponse.json({ ok: true, id: doc._id, data: doc });
   } catch (e) {
     console.error("[querysets:POST]", e);
-    return NextResponse.json({ ok:false, error: e.message || String(e) }, { status:500 });
+    return NextResponse.json(
+      { ok: false, error: e.message || String(e) },
+      { status: 500 }
+    );
   }
 }
 
@@ -78,7 +91,10 @@ export async function DELETE(req) {
     await connectDB();
     const userId = await getCurrentUserId(req);
     if (!userId) {
-      return NextResponse.json({ ok:false, error:"unauthorized" }, { status:401 });
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
     }
 
     const url = new URL(req.url);
@@ -92,17 +108,26 @@ export async function DELETE(req) {
     const _id = id || bodyId;
 
     if (!_id) {
-      return NextResponse.json({ ok:false, error:"id required" }, { status:400 });
+      return NextResponse.json(
+        { ok: false, error: "id required" },
+        { status: 400 }
+      );
     }
 
     const r = await SavedQueriesSet.deleteOne({ _id: _id, userId });
     if (r.deletedCount === 0) {
-      return NextResponse.json({ ok:false, error:"not found" }, { status:404 });
+      return NextResponse.json(
+        { ok: false, error: "not found" },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ ok:true, deleted:r.deletedCount });
+    return NextResponse.json({ ok: true, deleted: r.deletedCount });
   } catch (e) {
     console.error("[querysets:DELETE]", e);
-    return NextResponse.json({ ok:false, error: e.message || String(e) }, { status:500 });
+    return NextResponse.json(
+      { ok: false, error: e.message || String(e) },
+      { status: 500 }
+    );
   }
 }

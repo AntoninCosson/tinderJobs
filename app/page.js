@@ -20,7 +20,7 @@ export default function Page() {
         const d = await r.json();
         if (cancelled) return;
         if (d.authed) {
-          setAuthed(true); 
+          setAuthed(true);
           setStage("waking");
         } else {
           setStage("auth");
@@ -38,19 +38,18 @@ export default function Page() {
     };
   }, []);
 
-
   async function handleLogout() {
     await fetch("/api/signout", { method: "POST" });
     setStage("auth");
     setShowAuth(true);
-    setAuthed(false); 
+    setAuthed(false);
   }
 
   function notify(msg) {
     let text;
-    if (typeof msg === 'string') {
+    if (typeof msg === "string") {
       text = msg;
-    } else if (msg && typeof msg.message === 'string') {
+    } else if (msg && typeof msg.message === "string") {
       text = msg.message;
     } else {
       try {
@@ -59,11 +58,12 @@ export default function Page() {
         text = String(msg);
       }
     }
-    console.log('[HUB]', text ?? '(no message)');
+    console.log("[HUB]", text ?? "(no message)");
   }
 
   if (stage === "checking") return null;
-  if (stage === "waking") return <WakingScreen onReady={() => setStage("hub")} />;
+  if (stage === "waking")
+    return <WakingScreen onReady={() => setStage("hub")} />;
 
   if (stage === "auth") {
     return (
@@ -97,12 +97,11 @@ export default function Page() {
     );
   }
 
-  // ready
   return (
     <div
       style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}
     >
-      <Header onLogout={handleLogout} onHome={() => setStage('hub')} />
+      <Header onLogout={handleLogout} onHome={() => setStage("hub")} />
       <div style={{ flex: 1 }}>
         <AppContent authed={authed} />
       </div>

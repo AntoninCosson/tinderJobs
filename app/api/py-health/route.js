@@ -4,11 +4,14 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const base = process.env.PY_BACK_SCRAPE_URL;
   if (!base) {
-    return NextResponse.json({ ok: false, error: "PY_BACK_SCRAPE_URL missing" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "PY_BACK_SCRAPE_URL missing" },
+      { status: 500 }
+    );
   }
 
   const headers = {};
-  const token = process.env.SCRAPER_BEARER;
+  const token = process.env.SCRAPER_TOKEN;
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const paths = ["/health", "/healthz", "/"];
@@ -17,7 +20,9 @@ export async function GET() {
       const r = await fetch(`${base}${path}`, { headers, cache: "no-store" });
       if (r.ok) {
         let data = null;
-        try { data = await r.json(); } catch {}
+        try {
+          data = await r.json();
+        } catch {}
         return NextResponse.json({ ok: true, path, data });
       }
     } catch (_) {}
