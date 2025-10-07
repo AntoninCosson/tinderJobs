@@ -63,14 +63,7 @@ export async function POST(req) {
     );
   }
   const now = Date.now();
-  const items =
-    Array.isArray(inputItems) && inputItems.length
-      ? inputItems
-      : queries.map((q, idx) => ({
-          expectedName: `${(q?.query || "search").slice(0, 40)}-${idx}-${now}`,
-          url: q?.url || null,
-          payload: q,
-        }));
+
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
