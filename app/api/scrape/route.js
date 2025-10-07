@@ -5,7 +5,7 @@ import { getCurrentUserId } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const PY_URL = process.env.PY_BACK_SCRAPE_URL;
+const RAW = (process.env.PY_BACK_SCRAPE_URL || "").trim();
 const SCRAPER_TOKEN = process.env.SCRAPER_TOKEN || "";
 
 function json(data, init) {
@@ -24,12 +24,21 @@ export async function POST(req) {
   if (!userId)
     return json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  if (!PY_URL) {
+  if (!RAW) {
     return json(
       { ok: false, error: "PY_BACK_SCRAPE_URL not set" },
       { status: 501 }
     );
   }
+
+  let target;
+  try {
+    target = new URL(RAW);
+  } catch {
+    return json({ ok:false, error:"PY_BACK_SCRAPE_URL invalid" }, { status:500 });
+  }
+  if (!target.pathname || target.pathname === "/") target.pathname = "/run-cli";
+
 
   let body;
   try {
@@ -38,21 +47,18 @@ export async function POST(req) {
     return json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  const {
-    queries = [],
-    items: inputItems = [],
-    options = {},
-    scheduleId,
-  } = body || {};
+  // const {
+  //   queries = [],
+  //   items: inputItems = [],
+  //   options = {},
+  //   scheduleId,
+  // } = body || {};
 
-  const wantSync = Boolean(options?.sync);
+  const { queries = [], options = {}, scheduleId } = body || {};
 
-  if (
-    (!Array.isArray(queries) || queries.length === 0) &&
-    (!Array.isArray(inputItems) || inputItems.length === 0)
-  ) {
+  if (!Array.isArray(queries) || queries.length === 0) {
     return json(
-      { ok: false, error: "queries[] or items[] required" },
+      { ok: false, error: "queries[] required" },
       { status: 400 }
     );
   }
@@ -70,22 +76,15 @@ export async function POST(req) {
   const timeout = setTimeout(() => controller.abort(), 8000);
   let r;
   try {
-    r = await fetch(PY_URL, {
+    r = await fetch(target.toString(), {
       method: "POST",
       headers: {
         "content-type": "application/json",
         ...(SCRAPER_TOKEN ? { authorization: `Bearer ${SCRAPER_TOKEN}` } : {}),
         "x-user-id": String(userId),
         ...(scheduleId ? { "x-schedule-id": String(scheduleId) } : {}),
-        ...(wantSync ? { "x-sync": "1" } : {}), 
       },
-      body: JSON.stringify({
-        source: options?.source || "ui-tindrrjobs",
-        query: options?.querySetName || queries[0]?.query || "",
-        items,
-        // scheduleId
-        ...(wantSync ? { meta: { sync: true } } : {}),
-      }),
+      body: JSON.stringify({ queries, options }),
       signal: controller.signal,
       cache: "no-store",
     });
@@ -111,5 +110,5 @@ export async function POST(req) {
     );
   }
 
-  return json({ ok: true, count: d?.count ?? 0, received: d });
+  return json({ ok: true, sent: d?.sent ?? 0, received: d });
 }
