@@ -12,14 +12,7 @@ export default function CvA4Page({ offer, newOffer, onClose }) {
   const experiences = Array.isArray(cv.experiences) ? cv.experiences : [];
 
 
-  // const langs = useMemo(() => {
-  //   const arr = [];
-  //   if (p.anglais) arr.push(`Anglais ${p.anglais}`);
-  //   if (p.japonais) arr.push(`Japonais ${p.japonais}`);
-  //   return arr;
-  // }, [p.anglais, p.japonais]);
-
-  // A4 @96dpi approx
+  // A4
   const BASE_W = 793.7008;   // 210mm
   const BASE_H = 1122.5197;  // 297mm
 
@@ -32,7 +25,6 @@ export default function CvA4Page({ offer, newOffer, onClose }) {
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth;
       const h = el.clientHeight;
-      // contain: fit both width & height to keep full page visible
       const s = Math.min(w / BASE_W, h / BASE_H);
       setScale(s);
     });
@@ -77,7 +69,6 @@ export default function CvA4Page({ offer, newOffer, onClose }) {
       >
       {/* Canvas */}
         <div style={{ height: `${BASE_H * scale}px`, position: "relative" }}>
-          {/* A4 réel, centré, puis scale */}
           <div
             style={{
               position: "absolute",
@@ -207,7 +198,6 @@ export default function CvA4Page({ offer, newOffer, onClose }) {
           {skills && Object.keys(skills).length > 0 && (
             <div style={{ }}>
               <div style={{ fontSize: 18, marginBottom: 6, }}>
-                {/* Compétences : */}
               </div>
 
               {Object.entries(skills).map(([group, arr]) => (
@@ -236,7 +226,6 @@ export default function CvA4Page({ offer, newOffer, onClose }) {
           {Array.isArray(experiences) && experiences.length > 0 && (
             <div>
               <div style={{ fontSize: 18, marginBottom: 6 }}>
-                {/* Expériences Professionnelles : */}
               </div>
               {experiences.map((xp, i) => (
                 <div key={i} style={{ marginBottom: 10 }}>

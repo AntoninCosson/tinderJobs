@@ -77,7 +77,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     setIsSaved(false);
   }
 
-  
+
   async function runViaPython() {
     try {
       const valid = rows.filter((r) => (r?.query || "").trim().length);
@@ -89,7 +89,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
 
       const payload = {
         queries: valid,
-        options: { querySetName: editingName, sync: true },
+        options: { querySetName: editingName, sync: true, userEmail: currentUserEmail || "" },
       };
 
       console.log("[PY] POST /api/py/scrape", payload);
@@ -196,7 +196,7 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
     };
   }
 
-  function Stepper({ value, onChange, min = 0, max = 100, step = 10, label }) {
+  function Stepper({ value, onChange, min = 10, max = 100, step = 10, label }) {
     const v = Number.isFinite(Number(value)) ? Number(value) : 0;
     const clamp = (n) => Math.min(max, Math.max(min, n));
 
@@ -547,9 +547,9 @@ export default function QueriesModal({ onClose, onSubmit, loading }) {
                   <div>
                     <div style={fieldLabel}>Results</div>
                     <Stepper
-                      value={typeof r.results === "number" ? r.results : 0}
+                      value={typeof r.results === "number" ? r.results : 10}
                       onChange={(v) => update(i, { results: v })}
-                      min={0}
+                      min={10}
                       max={100}
                       step={10}
                     />

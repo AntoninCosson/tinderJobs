@@ -1,6 +1,6 @@
 // app/api/py/scrape/route.js
 import { NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/auth";
+import { getCurrentUserId, getCurrentUserEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,6 +21,7 @@ async function safeJson(res) {
 
 export async function POST(req) {
   const userId = await getCurrentUserId(req);
+  const email = await getCurrentUserEmail?.(req);
   if (!userId)
     return json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
@@ -54,7 +55,7 @@ export async function POST(req) {
   //   scheduleId,
   // } = body || {};
 
-  const { queries = [], options = {}, scheduleId } = body || {};
+  const { queries = [], options = {}, scheduleId, } = body || {};
 
   if (!Array.isArray(queries) || queries.length === 0) {
     return json(
@@ -75,6 +76,7 @@ export async function POST(req) {
         "content-type": "application/json",
         ...(SCRAPER_TOKEN ? { authorization: `Bearer ${SCRAPER_TOKEN}` } : {}),
         "x-user-id": String(userId),
+        ...(email ? { "x-user-email": String(email) } : {}),
         ...(scheduleId ? { "x-schedule-id": String(scheduleId) } : {}),
       },
       body: JSON.stringify({ queries, options }),
